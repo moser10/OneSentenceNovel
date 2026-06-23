@@ -2,6 +2,9 @@
   "name": "onesentencenovel",
   "private": true,
   "scripts": {
-    "deploy": "wrangler pages deploy public --commit-dirty=true"
+    "deploy": "wrangler pages deploy --project-name=onesentencenovel"
+  },
+  "devDependencies": {
+    "wrangler": "^4.30.0"
   }
 }
