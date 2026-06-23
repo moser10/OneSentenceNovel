@@ -69,7 +69,7 @@
         .modal-action { border-top: 0.5px solid rgba(0,0,0,0.15); color: var(--ios-blue); font-size: 17px; font-weight: 600; padding: 12px 0; text-align: center; cursor: pointer; }
         .modal-action:active { background: rgba(0,0,0,0.05); border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
     </style>
-    <link rel="stylesheet" href="/game/css/userBar.css">
+    <link rel="stylesheet" href="/game/css/userBar.css?v=2">
 </head>
 <body>
 
@@ -133,19 +133,19 @@
             zh: {
                 bj: "北京", sk: "圣何塞", db: "大阪", jdm: "加德满都",
                 about: "关于", mail: "邮箱", game: "小游戏",
-                userHint: "点击用户名退出登录", logout: "退出登录",
+                userHint: "点击退出", logout: "退出登录",
                 mTitle: "关于 1042", mText: "2026年6月，回文开始了。。。", mClose: "好"
             },
             en: {
                 bj: "Beijing", sk: "San Jose", db: "Osaka", jdm: "Kathmandu",
                 about: "About", mail: "Mail", game: "Games",
-                userHint: "Tap username to sign out", logout: "Sign out",
+                userHint: "Tap to sign out", logout: "Sign out",
                 mTitle: "About 1042", mText: "June 2026, the palindrome begins...", mClose: "OK"
             },
             ja: {
                 bj: "北京", sk: "サンノゼ", db: "大阪", jdm: "カトマンズ",
                 about: "情報", mail: "メール", game: "一文執筆",
-                userHint: "ユーザー名をタップしてログアウト", logout: "ログアウト",
+                userHint: "タップでログアウト", logout: "ログアウト",
                 mTitle: "1042 について", mText: "2026年6月、回文が始まった...", mClose: "了解"
             },
             bo: {
@@ -170,7 +170,7 @@
             document.getElementById('mdl-close').innerText = i18n[lang].mClose;
             
             localStorage.setItem('portal_lang', lang);
-            import('/game/js/userBar.js').then(({ mountUserBar }) => {
+            import('/game/js/userBar.js?v=2').then(({ mountUserBar }) => {
                 mountUserBar(document.getElementById('userBarSlot'), { variant: 'ios', returnPath: '' });
             });
         }

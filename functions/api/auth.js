@@ -3,6 +3,25 @@ import { hashPassword, verifyPassword, randomPassword } from "./_crypto.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function welcomeEmailHtml(name, verifyUrl, today) {
+  const safeName = escapeHtml(name);
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.8;color:#1c1c1e;">
+<p style="margin:0 0 12px;">欢迎 ${safeName}：</p>
+<p style="margin:0 0 8px;padding-left:2em;">首先验证邮件地址：<a href="${verifyUrl}">点击此处验证邮箱</a></p>
+<p style="margin:0 0 16px;padding-left:2em;">祝玩儿的开心。</p>
+<p style="margin:0;">1024201 游戏中心</p>
+<p style="margin:0;">${today}</p>
+</div>`;
+}
+
 async function sendMail(env, to, subject, html) {
   if (!env.RESEND_API_KEY) {
     throw new Error("邮件服务未配置（RESEND_API_KEY）。请在 Cloudflare → Workers → one-sentence-novel → Settings → Variables 添加 Secret。");
@@ -194,10 +213,7 @@ export async function onRequest(context) {
           env,
           mail,
           "1024201 游戏中心 · 请验证邮箱",
-          `<p>欢迎 <strong>${name}</strong> 来到1024201的游戏中心，首先验证邮件地址：</p>
-           <p><a href="${verifyUrl}">点击此处验证邮箱</a></p>
-           <p>祝玩儿的开心。</p>
-           <br><p>落款 1024201<br>${today}</p>`
+          welcomeEmailHtml(name, verifyUrl, today)
         );
       } catch (err) {
         await db.prepare("DELETE FROM pending_registrations WHERE verify_token = ?").bind(verifyToken).run();

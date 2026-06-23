@@ -19,6 +19,25 @@
 .user-bar--ios .user-bar-guest svg,
 .user-bar--ios .user-bar-name { min-height: 32px; }
 .user-bar--ios .user-bar-guest svg { width: 18px; height: 18px; fill: #007aff; }
+.user-bar-handle {
+  display: inline-flex;
+  align-items: baseline;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.user-bar-at,
+.user-bar-name-text {
+  font-size: inherit;
+  font-weight: inherit;
+  font-family: inherit;
+  line-height: inherit;
+}
+.user-bar-name-text { font-variant-numeric: tabular-nums; }
+.user-bar-signed { display: flex; flex-direction: column; align-items: flex-end; }
+.user-bar-hint { cursor: pointer; }
 .user-bar--ios .user-bar-guest:active,
 .user-bar--ios .user-bar-name:active { transform: scale(0.95); background: #e5e5ea; }
 .user-bar--game .user-bar-guest,
@@ -37,6 +56,7 @@
   text-decoration: none;
 }
 .user-bar--game .user-bar-guest svg { width: 18px; height: 18px; fill: #007aff; }
+.user-bar--game .user-bar-handle { font-size: 13px; font-weight: 600; }
 .user-bar-hint {
   font-size: 11px;
   color: #8e8e93;
