@@ -27,7 +27,7 @@ export async function onRequest(context) {
   // 1. 实时查重与智能随机数接口 (POST /api/auth?action=check)
   if (request.method === "POST" && url.searchParams.get("action") === "check") {
     const { username } = await request.json();
-    const existing = await db.prepare("SELECT id FROM users WHERE username = ?").bind(username.trim()).first();
+    const existing = await env.DB.prepare("SELECT id FROM users WHERE username = ?").bind(username.trim()).first();
     
     if (existing) {
       const recommendation = await generateUniqueRecommend(env.DB, username.trim());

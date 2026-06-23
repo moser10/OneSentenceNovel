@@ -1,0 +1,6 @@
+name = "onesentencenovel"
+compatibility_date = "2024-09-23"
+pages_build_output_dir = "."
+
+# D1 binding: Cloudflare Dashboard → Pages → Settings → Functions
+# Add D1 database binding with variable name "DB"

@@ -31,7 +31,10 @@
 
     <!-- 提交表单 -->
     <div class="form-group">
-        <input type="text" id="authorInput" placeholder="输入你的群昵称..." maxlength="10">
+        <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="authorInput" placeholder="输入你的群昵称..." maxlength="10" style="flex:1;">
+            <button type="button" id="randSuggestBtn" disabled style="flex-shrink:0;padding:12px;font-size:13px;opacity:0.4;">推荐昵称</button>
+        </div>
         <textarea id="textInput" placeholder="接上一句，写下你的一句话 (限50字)..." maxlength="50"></textarea>
         <button onclick="submitLine()">发表接龙</button>
     </div>
@@ -45,24 +48,28 @@
 
         // 获取并渲染整篇小说
         async function loadStory() {
+            const storyBox = document.getElementById('storyBox');
             try {
                 const res = await fetch(`${API_URL}/api/lines`);
-                if (!res.ok) throw new Error();
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    const detail = body.error ? `（${body.error}）` : `（HTTP ${res.status}）`;
+                    throw new Error(detail);
+                }
                 const data = await res.json();
-                const storyBox = document.getElementById('storyBox');
                 
                 if (data.length === 0) {
                     storyBox.innerHTML = "等待第一位作者开启世界线...";
                     return;
                 }
 
-                // 拼接文字
                 storyBox.innerHTML = data.map(item => {
                     const info = `@${item.author} 在 ${item.time}`;
                     return `<span class="line-item" data-info="${info}">${item.text}</span>`;
                 }).join('');
             } catch (err) {
-                document.getElementById('storyBox').innerHTML = "❌ 加载失败，请检查 Cloudflare D1 数据库绑定或重新部署。";
+                const detail = err.message && err.message.startsWith('（') ? err.message : '';
+                storyBox.innerHTML = `❌ 加载失败，请检查 Cloudflare D1 数据库绑定或重新部署。${detail}`;
             }
         }
 
@@ -109,9 +116,10 @@
             // 1. 用户名字输入框防抖动查重与“反灰色”控制
         let timer = null;
         const nameInput = document.getElementById('authorInput');
-        const randBtn = document.getElementById('randSuggestBtn'); // 假设的推荐按钮
+        const randBtn = document.getElementById('randSuggestBtn');
 
         nameInput.addEventListener('input', () => {
+            if (!randBtn) return;
             // 只要用户修改、删除了任何字符，推荐随机数按钮立刻变灰禁用
             randBtn.disabled = true;
             randBtn.style.opacity = "0.4";
@@ -137,12 +145,13 @@
             }, 500); // 500ms防抖，避免高频请求后端
         });
 
-        // 点击推荐数自动填缺补齐
-        randBtn.addEventListener('click', () => {
-            nameInput.value = randBtn.dataset.v;
-            randBtn.disabled = true;
-            randBtn.style.opacity = "0.4";
-        });
+        if (randBtn) {
+            randBtn.addEventListener('click', () => {
+                nameInput.value = randBtn.dataset.v;
+                randBtn.disabled = true;
+                randBtn.style.opacity = "0.4";
+            });
+        }
 
 
         // 2. 一键无损下载写书内容为 PDF (采用最稳健的 html2pdf 框架流)
