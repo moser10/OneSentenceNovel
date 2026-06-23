@@ -1,6 +1,0 @@
-name = "onesentencenovel"
-compatibility_date = "2024-09-23"
-pages_build_output_dir = "public"
-
-# Pages Functions: functions/api/*.js → /api/*
-# D1 binding: Pages 项目 → Settings → Functions → D1 database bindings → 变量名 DB
