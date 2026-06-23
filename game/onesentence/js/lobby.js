@@ -1,6 +1,6 @@
 import { authApi, roomApi } from "./api.js";
 import { bindNameCheck } from "./nameCheck.js";
-import { getUser, setRoom, clearUser, clearRoom } from "./store.js";
+import { getUser, setUser, setRoom } from "../../js/store.js";
 
 export function renderLobby(app, onEnterRoom) {
   const user = getUser();
@@ -12,7 +12,7 @@ export function renderLobby(app, onEnterRoom) {
         <h1>大厅</h1>
         <div class="row" style="margin:0;">
           <span class="badge">@${user.username}</span>
-          <button id="leaveLobbyBtn" class="btn-secondary btn-small">离开大厅</button>
+          <button id="leaveLobbyBtn" class="btn-secondary btn-small">返回游戏中心</button>
         </div>
       </div>
 
@@ -65,8 +65,7 @@ export function renderLobby(app, onEnterRoom) {
   document.getElementById("leaveLobbyBtn").onclick = () => {
     clearInterval(todoTimer);
     clearRoom();
-    clearUser();
-    onEnterRoom();
+    window.location.href = "/game/";
   };
 
   bindNameCheck({
@@ -197,6 +196,7 @@ export function renderLobby(app, onEnterRoom) {
 
   async function loadTodos() {
     const box = document.getElementById("todoBox");
+    const currentUser = getUser();
     try {
       const data = await roomApi.todos(user.id);
       const approveHtml = data.to_approve.length
@@ -225,7 +225,18 @@ export function renderLobby(app, onEnterRoom) {
             .join("")}`
         : `<p class="sub">暂无待通过申请</p>`;
 
-      box.innerHTML = approveHtml + waitingHtml;
+      const pwdHtml = currentUser.must_change_password
+        ? `<h3>账户安全</h3>
+           <div class="todo-group">
+             <p class="sub">你正在使用临时密码，请尽快修改</p>
+             <input type="password" id="newPass1" placeholder="新密码">
+             <input type="password" id="newPass2" placeholder="确认新密码">
+             <p id="pwdHint" class="hint"></p>
+             <button id="changePwdBtn" class="btn-primary" disabled>修改密码</button>
+           </div>`
+        : "";
+
+      box.innerHTML = pwdHtml + approveHtml + waitingHtml;
 
       box.querySelectorAll(".approve-btn").forEach((btn) => {
         btn.onclick = async () => {
@@ -234,6 +245,46 @@ export function renderLobby(app, onEnterRoom) {
           loadMyRooms();
         };
       });
+
+      const pwdBtn = document.getElementById("changePwdBtn");
+      if (pwdBtn) {
+        const p1 = document.getElementById("newPass1");
+        const p2 = document.getElementById("newPass2");
+        const hint = document.getElementById("pwdHint");
+        const sync = () => {
+          if (!p1.value || !p2.value) {
+            pwdBtn.disabled = true;
+            hint.textContent = "";
+            return;
+          }
+          if (p1.value !== p2.value) {
+            pwdBtn.disabled = true;
+            hint.textContent = "两次密码不一致";
+            hint.className = "hint err";
+          } else if (p1.value.length < 6) {
+            pwdBtn.disabled = true;
+            hint.textContent = "密码至少 6 位";
+            hint.className = "hint err";
+          } else {
+            pwdBtn.disabled = false;
+            hint.textContent = "✓ 可以提交";
+            hint.className = "hint ok";
+          }
+        };
+        p1.oninput = sync;
+        p2.oninput = sync;
+        pwdBtn.onclick = async () => {
+          try {
+            const res = await authApi.changePassword(currentUser.id, p1.value, p2.value);
+            currentUser.must_change_password = false;
+            setUser(currentUser);
+            alert(res.message);
+            loadTodos();
+          } catch (e) {
+            alert(e.message);
+          }
+        };
+      }
     } catch (e) {
       box.innerHTML = `<p class="hint err">${e.message}</p>`;
     }

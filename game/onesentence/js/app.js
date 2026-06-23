@@ -1,19 +1,15 @@
-import { getUser, getRoom, clearRoom } from "./store.js";
-import { renderRegister } from "./register.js";
+import { getUser, getRoom, clearRoom } from "../../js/store.js";
 import { renderLobby } from "./lobby.js";
 import { renderPlay } from "./play.js";
+
+if (!getUser()) {
+  window.location.href = `/game/register/?return=${encodeURIComponent("onesentence/")}`;
+}
 
 const app = document.getElementById("app");
 
 function route() {
-  const user = getUser();
   const room = getRoom();
-
-  if (!user) {
-    renderRegister(app, route);
-    return;
-  }
-
   if (room?.id) {
     renderPlay(app, () => {
       clearRoom();
@@ -21,7 +17,6 @@ function route() {
     });
     return;
   }
-
   renderLobby(app, route);
 }
 

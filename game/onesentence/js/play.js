@@ -1,6 +1,6 @@
 import { roomApi } from "./api.js";
 import { bindNameCheck } from "./nameCheck.js";
-import { getUser, getRoom } from "./store.js";
+import { getUser, getRoom } from "../../js/store.js";
 
 let pollTimer = null;
 let heartbeatTimer = null;
@@ -16,6 +16,7 @@ export function renderPlay(app, onLeave) {
     <div class="card">
       <div class="header-row">
         <div>
+          <p class="game-brand">One Sentence Novel</p>
           <h1 id="roomTitle">${room.title}</h1>
           <p class="sub" id="roomMeta"></p>
         </div>

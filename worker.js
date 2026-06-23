@@ -2,10 +2,13 @@ import * as lines from "./functions/api/lines.js";
 import * as auth from "./functions/api/auth.js";
 import * as room from "./functions/api/room.js";
 
+import * as admin from "./functions/api/admin.js";
+
 const API_ROUTES = {
   "/api/lines": lines,
   "/api/auth": auth,
   "/api/room": room,
+  "/api/admin": admin,
 };
 
 export default {

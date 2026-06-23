@@ -32,3 +32,10 @@ export function setRoom(room) {
 export function clearRoom() {
   localStorage.removeItem(ROOM_KEY);
 }
+
+export function requireAuth(returnPath) {
+  if (getUser()) return true;
+  const ret = returnPath ? `?return=${encodeURIComponent(returnPath)}` : "";
+  window.location.href = `/game/register/${ret}`;
+  return false;
+}

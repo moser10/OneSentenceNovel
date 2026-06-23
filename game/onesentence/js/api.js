@@ -17,10 +17,14 @@ export async function api(path, options = {}) {
 export const authApi = {
   checkName: (username) =>
     api("/api/auth?action=check", { method: "POST", body: JSON.stringify({ username }) }),
-  register: (email, username) =>
-    api("/api/auth?action=register", { method: "POST", body: JSON.stringify({ email, username }) }),
-  login: (email) =>
-    api("/api/auth?action=login", { method: "POST", body: JSON.stringify({ email }) }),
+  register: (email, username, password) =>
+    api("/api/auth?action=register", { method: "POST", body: JSON.stringify({ email, username, password }) }),
+  login: (email, password) =>
+    api("/api/auth?action=login", { method: "POST", body: JSON.stringify({ email, password }) }),
+  forgot: (email) =>
+    api("/api/auth?action=forgot", { method: "POST", body: JSON.stringify({ email }) }),
+  changePassword: (user_id, password, password2) =>
+    api("/api/auth?action=change_password", { method: "POST", body: JSON.stringify({ user_id, password, password2 }) }),
   searchUsers: (q) => api(`/api/auth?action=search&q=${encodeURIComponent(q)}`),
 };
 

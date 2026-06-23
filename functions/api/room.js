@@ -69,7 +69,7 @@ export async function onRequest(context) {
       let storyId;
       try {
         const result = await db
-          .prepare("INSERT INTO stories (title, owner_id, invite_code) VALUES (?, ?, ?)")
+          .prepare("INSERT INTO stories (title, owner_id, invite_code, game_id) VALUES (?, ?, ?, 'osn')")
           .bind(name, owner_id, inviteCode)
           .run();
         storyId = result.meta.last_row_id;
