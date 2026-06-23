@@ -13,7 +13,8 @@ const API_ROUTES = {
 
 export default {
   async fetch(request, env, ctx) {
-    const { pathname } = new URL(request.url);
+    const url = new URL(request.url);
+    const { pathname } = url;
 
     if (pathname === "/api/health") {
       return new Response(
@@ -31,6 +32,30 @@ export default {
     if (handler) {
       return handler.onRequest({ request, env, ctx });
     }
-    return env.ASSETS.fetch(request);
+
+    return serveStatic(request, env);
   },
 };
+
+async function serveStatic(request, env) {
+  const url = new URL(request.url);
+  let { pathname } = url;
+
+  // /game/gamebgp → /game/gamebgp/
+  if (!pathname.endsWith("/") && !pathname.includes(".")) {
+    const redirectUrl = new URL(request.url);
+    redirectUrl.pathname = `${pathname}/`;
+    return Response.redirect(redirectUrl.toString(), 301);
+  }
+
+  let response = await env.ASSETS.fetch(request);
+  if (response.status !== 404) return response;
+
+  if (pathname.endsWith("/")) {
+    const indexUrl = new URL(request.url);
+    indexUrl.pathname = `${pathname}index.html`;
+    response = await env.ASSETS.fetch(new Request(indexUrl, request));
+  }
+
+  return response;
+}
