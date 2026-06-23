@@ -1,5 +1,5 @@
 # Worker 名称必须与 Cloudflare 控制台里实际接域名的 Worker 一致
-name = "one-sentence-novel"
+name = "onesentencenovel"
 main = "worker.js"
 compatibility_date = "2024-09-23"
 workers_dev = false
