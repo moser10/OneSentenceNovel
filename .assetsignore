@@ -4,3 +4,5 @@ schema.sql
 wrangler.toml
 .git/**
 .gitignore
+.cursor/**
+.wrangler/**
