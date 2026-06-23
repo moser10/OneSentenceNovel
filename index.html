@@ -3,109 +3,194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤝 一人一句接龙小说 (OSN)</title>
+    <title>1024201 | 1042 Portal</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fafafa; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-        h1 { text-align: center; color: #2c3e50; font-size: 24px; margin-bottom: 5px; }
-        .subtitle { text-align: center; color: #7f8c8d; font-size: 14px; margin-bottom: 25px; }
-        .story-container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); min-height: 180px; margin-bottom: 20px; line-height: 1.8; font-size: 16px; word-break: break-all; }
-        .line-item { display: inline; position: relative; cursor: pointer; margin-right: 6px; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; }
-        .line-item:hover { background: #e8f4fd; color: #007aff; }
-        /* 鼠标悬浮气泡提示作者和时间 */
-        .line-item:hover::after { content: attr(data-info); position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #333; color: white; font-size: 12px; padding: 6px 10px; border-radius: 4px; white-space: nowrap; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-        .form-group { display: flex; flex-direction: column; gap: 12px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        input, textarea { padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border 0.2s; }
-        input:focus, textarea:focus { border-color: #007aff; }
-        textarea { resize: none; height: 60px; }
-        button { background: #007aff; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
-        button:hover { background: #0063cc; }
+        /* iOS 原生系统设计规范 */
+        :root {
+            --ios-bg: #f2f2f7;
+            --ios-card: #ffffff;
+            --ios-text: #000000;
+            --ios-text-secondary: #8e8e93;
+            --ios-blue: #007aff;
+            --ios-blur-bg: rgba(255, 255, 255, 0.7);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+        
+        body { background-color: var(--ios-bg); color: var(--ios-text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 20px; overflow-x: hidden; }
+
+        /* 顶部导航栏 (iOS 磨砂玻璃状态栏风格) */
+        header { width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; z-index: 10; }
+
+        /* 左上角：多国时区（iOS 世界时钟组件扁平化风格） */
+        .time-zones { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; background: var(--ios-card); padding: 12px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
+        .zone-item { font-size: 11px; color: var(--ios-text-secondary); font-weight: 500; display: flex; flex-direction: column; }
+        .zone-time { font-size: 14px; color: var(--ios-text); font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+
+        /* 右上角：控制区 */
+        .controls { display: flex; gap: 10px; align-items: center; }
+        .ios-btn { background: var(--ios-card); border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 500; color: var(--ios-blue); cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: all 0.2s; }
+        .ios-btn:active { transform: scale(0.95); background: #e5e5ea; }
+        select.ios-btn { appearance: none; padding-right: 24px; background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23007aff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: calc(100% - 8px) center; }
+
+        /* 主体中心区 */
+        main { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-grow: 1; gap: 40px; margin: 40px 0; }
+        
+        /* 门户大标题（回文数 1042） */
+        .portal-title { font-size: 42px; font-weight: 700; tracking: -0.5px; color: #1c1c1e; }
+
+        /* 图标矩阵 */
+        .app-grid { display: flex; gap: 45px; justify-content: center; align-items: center; }
+        
+        /* iOS App 经典正方形黄金圆角 */
+        .app-item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: var(--ios-text); cursor: pointer; }
+        .app-icon { width: 90px; height: 90px; border-radius: 21.5%; box-shadow: 0 8px 24px rgba(0,0,0,0.08); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; justify-content: center; }
+        .app-item:hover .app-icon { transform: scale(1.06); }
+        .app-item:active .app-icon { transform: scale(0.94); }
+        
+        /* iOS 默认微渐变色彩搭配 */
+        .icon-mail { background: linear-gradient(135deg, #54cbff 0%, #007aff 100%); }
+        .icon-game { background: linear-gradient(135deg, #ff5e62 0%, #ff9966 100%); }
+        
+        .app-icon svg { width: 44px; height: 44px; fill: white; }
+        .app-label { margin-top: 10px; font-size: 14px; font-weight: 500; letter-spacing: -0.2px; }
+
+        /* 页脚版权 */
+        footer { font-size: 12px; color: var(--ios-text-secondary); padding: 10px 0; }
+
+        /* iOS 原生弹窗 (Modal) 样式 */
+        .ios-modal-mask { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+        .ios-modal-mask.active { opacity: 1; pointer-events: auto; }
+        .ios-modal { background: var(--ios-blur-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); width: 280px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: flex; flex-direction: column; transform: scale(1.1); transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+        .ios-modal-mask.active .ios-modal { transform: scale(1); }
+        .modal-body { padding: 20px; text-align: center; }
+        .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+        .modal-text { font-size: 13px; color: #000; line-height: 1.4; }
+        .modal-action { border-top: 0.5px solid rgba(0,0,0,0.15); color: var(--ios-blue); font-size: 17px; font-weight: 600; padding: 12px 0; text-align: center; cursor: pointer; }
+        .modal-action:active { background: rgba(0,0,0,0.05); border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
     </style>
 </head>
 <body>
 
-    <h1>📝 OneSentenceNovel</h1>
-    <div class="subtitle">群友的第一部共创史诗（鼠标悬浮/点击句子可看作者）</div>
-    
-    <!-- 小说主体展示区 -->
-    <div class="story-container" id="storyBox">故事加载中...</div>
+    <header>
+        <div class="time-zones">
+            <div class="zone-item"><span id="lbl-bj">北京</span><span class="zone-time" id="tz-bj">--:--</span></div>
+            <div class="zone-item"><span id="lbl-sk">圣何塞</span><span class="zone-time" id="tz-sk">--:--</span></div>
+            <div class="zone-item"><span id="lbl-db">大阪</span><span class="zone-time" id="tz-db">--:--</span></div>
+            <div class="zone-item"><span id="lbl-jdm">加德满都</span><span class="zone-time" id="tz-jdm">--:--</span></div>
+        </div>
 
-    <!-- 提交表单 -->
-    <div class="form-group">
-        <input type="text" id="authorInput" placeholder="输入你的群昵称..." maxlength="10">
-        <textarea id="textInput" placeholder="接上一句，写下你的一句话 (限50字)..." maxlength="50"></textarea>
-        <button onclick="submitLine()">发表接龙</button>
+        <div class="controls">
+            <select class="ios-btn" id="langSelect" onchange="changeLang(this.value)">
+                <option value="zh">简体中文</option>
+                <option value="en">English</option>
+                <option value="ja">日本語</option>
+                <option value="bo">བོད་སྐད།</option>
+            </select>
+            <button class="ios-btn" id="btn-about" onclick="toggleModal(true)">关于</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="portal-title">1042</div>
+        
+        <div class="app-grid">
+            <a href="https://mail.1024201.com" class="app-item">
+                <div class="app-icon icon-mail">
+                    <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                </div>
+                <div class="app-label" id="app-mail">邮箱</div>
+            </a>
+
+            <a href="/game/" class="app-item">
+                <div class="app-icon icon-game">
+                    <svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                </div>
+                <div class="app-label" id="app-game">一句写书</div>
+            </a>
+        </div>
+    </main>
+
+    <footer>
+        &copy; 2026 1024201.com
+    </footer>
+
+    <div class="ios-modal-mask" id="aboutModal" onclick="toggleModal(false)">
+        <div class="ios-modal" onclick="event.stopPropagation()">
+            <div class="modal-body">
+                <div class="modal-title" id="mdl-title">关于 1042</div>
+                <div class="modal-text" id="mdl-text">2026年6月，回文开始了。。。</div>
+            </div>
+            <div class="modal-action" onclick="toggleModal(false)" id="mdl-close">好</div>
+        </div>
     </div>
 
     <script>
-        // 🛠️ 关键改动：因为同域名部署，这里直接留空，会自动去请求你自己的 /api/lines 后端
-        const API_URL = ""; 
-
-        // 自动从本地缓存读取群昵称，免得每次都输
-        document.getElementById('authorInput').value = localStorage.getItem('story_author') || '';
-
-        // 获取并渲染整篇小说
-        async function loadStory() {
-            try {
-                const res = await fetch(`${API_URL}/api/lines`);
-                if (!res.ok) throw new Error();
-                const data = await res.json();
-                const storyBox = document.getElementById('storyBox');
-                
-                if (data.length === 0) {
-                    storyBox.innerHTML = "等待第一位作者开启世界线...";
-                    return;
-                }
-
-                // 拼接文字
-                storyBox.innerHTML = data.map(item => {
-                    const info = `@${item.author} 在 ${item.time}`;
-                    return `<span class="line-item" data-info="${info}">${item.text}</span>`;
-                }).join('');
-            } catch (err) {
-                document.getElementById('storyBox').innerHTML = "❌ 加载失败，请检查 Cloudflare D1 数据库绑定或重新部署。";
+        // 多语言字典配置
+        const i18n = {
+            zh: {
+                bj: "北京", sk: "圣何塞", db: "大阪", jdm: "加德满都",
+                about: "关于", mail: "邮箱", game: "一句写书",
+                mTitle: "关于 1042", mText: "2026年6月，回文开始了。。。", mClose: "好"
+            },
+            en: {
+                bj: "Beijing", sk: "San Jose", db: "Osaka", jdm: "Kathmandu",
+                about: "About", mail: "Mail", game: "OSN Game",
+                mTitle: "About 1042", mText: "June 2026, the palindrome begins...", mClose: "OK"
+            },
+            ja: {
+                bj: "北京", sk: "サンノゼ", db: "大阪", jdm: "カトマンズ",
+                about: "情報", mail: "メール", game: "一文執筆",
+                mTitle: "1042 について", mText: "2026年6月、回文が始まった...", mClose: "了解"
+            },
+            bo: {
+                bj: "པེ་ཅིང།", sk: "སན་ཧོ་སེ།", db: "ཨོ་སཱ་ཀཱ།", jdm: "ཀཐ་མན་གྲུ།",
+                about: "སྐོར།", mail: "ཡིག་ཟམ།", game: "ཚིག་གཅིག་དེབ་འབྲི།",
+                mTitle: "1042 སྐོར།", mText: "༢༠༢༦ ལོའི་ཟླ་ ༦ པར། ལྡོག་ཚིག་འགོ་བཙུགས་སོ།།", mClose: "ཡིན།"
             }
+        };
+
+        // 切换语言逻辑
+        function changeLang(lang) {
+            document.getElementById('lbl-bj').innerText = i18n[lang].bj;
+            document.getElementById('lbl-sk').innerText = i18n[lang].sk;
+            document.getElementById('lbl-db').innerText = i18n[lang].db;
+            document.getElementById('lbl-jdm').innerText = i18n[lang].jdm;
+            document.getElementById('btn-about').innerText = i18n[lang].about;
+            document.getElementById('app-mail').innerText = i18n[lang].mail;
+            document.getElementById('app-game').innerText = i18n[lang].game;
+            document.getElementById('mdl-title').innerText = i18n[lang].mTitle;
+            document.getElementById('mdl-text').innerText = i18n[lang].mText;
+            document.getElementById('mdl-close').innerText = i18n[lang].mClose;
+            
+            localStorage.setItem('portal_lang', lang);
         }
 
-        // 提交接龙
-        async function submitLine() {
-            const author = document.getElementById('authorInput').value.trim();
-            const text = document.getElementById('textInput').value.trim();
-
-            if (!author || !text) {
-                alert("名字和内容都写一点吧！");
-                return;
-            }
-
-            // 保存昵称到浏览器本地缓存
-            localStorage.setItem('story_author', author);
-
-            try {
-                const res = await fetch(`${API_URL}/api/lines`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ text, author })
-                });
-                
-                const result = await res.json();
-                
-                if (!res.ok) {
-                    alert(result.error || "提交失败");
-                    return;
-                }
-
-                // 成功后清空当前输入框并重新拉取小说
-                document.getElementById('textInput').value = '';
-                loadStory();
-            } catch (err) {
-                alert("网络错误，提交失败");
-            }
+        // 弹窗控制
+        function toggleModal(show) {
+            const modal = document.getElementById('aboutModal');
+            if(show) modal.classList.add('active');
+            else modal.classList.remove('active');
         }
 
-        // 页面初始化加载
-        loadStory();
-        
-        // 每 8 秒自动在后台刷新一次小说内容，保证群友们能同步看到最新的句子
-        setInterval(loadStory, 8000);
+        // 世界时钟高精引擎
+        function updateClocks() {
+            const now = new Date();
+            const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+
+            document.getElementById('tz-bj').innerText = now.toLocaleTimeString('zh-CN', { ...options, timeZone: 'Asia/Shanghai' });
+            document.getElementById('tz-db').innerText = now.toLocaleTimeString('zh-CN', { ...options, timeZone: 'Asia/Tokyo' });
+            document.getElementById('tz-sk').innerText = now.toLocaleTimeString('zh-CN', { ...options, timeZone: 'America/Los_Angeles' });
+            document.getElementById('tz-jdm').innerText = now.toLocaleTimeString('zh-CN', { ...options, timeZone: 'Asia/Kathmandu' });
+        }
+
+        // 初始化加载
+        const savedLang = localStorage.getItem('portal_lang') || 'zh';
+        document.getElementById('langSelect').value = savedLang;
+        changeLang(savedLang);
+
+        updateClocks();
+        setInterval(updateClocks, 1000);
     </script>
 </body>
 </html>

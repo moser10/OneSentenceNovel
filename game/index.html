@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤝 一人一句接龙小说 (OSN)</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fafafa; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; color: #2c3e50; font-size: 24px; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #7f8c8d; font-size: 14px; margin-bottom: 25px; }
+        .story-container { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); min-height: 180px; margin-bottom: 20px; line-height: 1.8; font-size: 16px; word-break: break-all; }
+        .line-item { display: inline; position: relative; cursor: pointer; margin-right: 6px; padding: 2px 4px; border-radius: 4px; transition: background 0.2s; }
+        .line-item:hover { background: #e8f4fd; color: #007aff; }
+        /* 鼠标悬浮气泡提示作者和时间 */
+        .line-item:hover::after { content: attr(data-info); position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%); background: #333; color: white; font-size: 12px; padding: 6px 10px; border-radius: 4px; white-space: nowrap; z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+        .form-group { display: flex; flex-direction: column; gap: 12px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        input, textarea { padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; transition: border 0.2s; }
+        input:focus, textarea:focus { border-color: #007aff; }
+        textarea { resize: none; height: 60px; }
+        button { background: #007aff; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: bold; transition: background 0.2s; }
+        button:hover { background: #0063cc; }
+    </style>
+</head>
+<body>
+
+    <h1>📝 OneSentenceNovel</h1>
+    <div class="subtitle">群友的第一部共创史诗（鼠标悬浮/点击句子可看作者）</div>
+    
+    <!-- 小说主体展示区 -->
+    <div class="story-container" id="storyBox">故事加载中...</div>
+
+    <!-- 提交表单 -->
+    <div class="form-group">
+        <input type="text" id="authorInput" placeholder="输入你的群昵称..." maxlength="10">
+        <textarea id="textInput" placeholder="接上一句，写下你的一句话 (限50字)..." maxlength="50"></textarea>
+        <button onclick="submitLine()">发表接龙</button>
+    </div>
+
+    <script>
+        // 🛠️ 关键改动：因为同域名部署，这里直接留空，会自动去请求你自己的 /api/lines 后端
+        const API_URL = ""; 
+
+        // 自动从本地缓存读取群昵称，免得每次都输
+        document.getElementById('authorInput').value = localStorage.getItem('story_author') || '';
+
+        // 获取并渲染整篇小说
+        async function loadStory() {
+            try {
+                const res = await fetch(`${API_URL}/api/lines`);
+                if (!res.ok) throw new Error();
+                const data = await res.json();
+                const storyBox = document.getElementById('storyBox');
+                
+                if (data.length === 0) {
+                    storyBox.innerHTML = "等待第一位作者开启世界线...";
+                    return;
+                }
+
+                // 拼接文字
+                storyBox.innerHTML = data.map(item => {
+                    const info = `@${item.author} 在 ${item.time}`;
+                    return `<span class="line-item" data-info="${info}">${item.text}</span>`;
+                }).join('');
+            } catch (err) {
+                document.getElementById('storyBox').innerHTML = "❌ 加载失败，请检查 Cloudflare D1 数据库绑定或重新部署。";
+            }
+        }
+
+        // 提交接龙
+        async function submitLine() {
+            const author = document.getElementById('authorInput').value.trim();
+            const text = document.getElementById('textInput').value.trim();
+
+            if (!author || !text) {
+                alert("名字和内容都写一点吧！");
+                return;
+            }
+
+            // 保存昵称到浏览器本地缓存
+            localStorage.setItem('story_author', author);
+
+            try {
+                const res = await fetch(`${API_URL}/api/lines`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ text, author })
+                });
+                
+                const result = await res.json();
+                
+                if (!res.ok) {
+                    alert(result.error || "提交失败");
+                    return;
+                }
+
+                // 成功后清空当前输入框并重新拉取小说
+                document.getElementById('textInput').value = '';
+                loadStory();
+            } catch (err) {
+                alert("网络错误，提交失败");
+            }
+        }
+
+        // 页面初始化加载
+        loadStory();
+        
+        // 每 8 秒自动在后台刷新一次小说内容，保证群友们能同步看到最新的句子
+        setInterval(loadStory, 8000);
+    </script>
+</body>
+</html>
