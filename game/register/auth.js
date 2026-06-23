@@ -19,6 +19,8 @@ async function api(path, options = {}) {
 const authApi = {
   checkName: (username) =>
     api("/api/auth?action=check", { method: "POST", body: JSON.stringify({ username }) }),
+  checkEmail: (email) =>
+    api("/api/auth?action=check_email", { method: "POST", body: JSON.stringify({ email }) }),
   register: (email, username, password) =>
     api("/api/auth?action=register", { method: "POST", body: JSON.stringify({ email, username, password }) }),
   login: (email, password) =>
@@ -29,20 +31,25 @@ const authApi = {
 
 const params = new URLSearchParams(location.search);
 const returnTo = params.get("return") || "/game/";
+const verifyStatus = params.get("verify");
 
 const app = document.getElementById("app");
-app.innerHTML = `
+
+function renderShell() {
+  app.innerHTML = `
   <div class="card">
     <a href="/game/" class="back">← 返回游戏中心</a>
     <h1>注册游戏账户 · 一票通</h1>
     <p class="sub">一个账号，畅玩所有游戏</p>
+    <div id="verifyBanner"></div>
     <div class="tabs">
       <div class="tab active" data-tab="register">注册</div>
       <div class="tab" data-tab="login">登录</div>
     </div>
     <div id="panelRegister" class="panel active">
       <label>邮箱</label>
-      <input type="email" id="regEmail" maxlength="80">
+      <input type="email" id="regEmail" maxlength="80" autocomplete="email">
+      <p id="regEmailHint" class="hint"></p>
       <label>昵称（唯一）</label>
       <div class="row">
         <input type="text" id="regName" maxlength="20">
@@ -65,12 +72,35 @@ app.innerHTML = `
       <button id="forgotBtn" class="btn-link">忘记密码？获取临时密码</button>
     </div>
   </div>`;
+}
+
+function showVerifyBanner() {
+  const box = document.getElementById("verifyBanner");
+  if (!box) return;
+  if (verifyStatus === "ok") {
+    box.innerHTML = `<p class="hint ok">邮箱验证成功，请登录。</p>`;
+    switchTab("login");
+  } else if (verifyStatus === "invalid") {
+    box.innerHTML = `<p class="hint err">验证链接无效或已过期，请重新注册或联系管理员。</p>`;
+  }
+}
 
 function switchTab(name) {
   document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === name));
   document.getElementById("panelRegister").classList.toggle("active", name === "register");
   document.getElementById("panelLogin").classList.toggle("active", name === "login");
 }
+
+let nameOk = false;
+let emailOk = false;
+let passOk = false;
+
+function syncRegBtn() {
+  document.getElementById("regBtn").disabled = !(nameOk && emailOk && passOk);
+}
+
+renderShell();
+showVerifyBanner();
 
 document.querySelectorAll(".tab").forEach((t) => {
   t.onclick = () => switchTab(t.dataset.tab);
@@ -81,31 +111,76 @@ bindNameCheck({
   btn: document.getElementById("regSuggest"),
   hint: document.getElementById("regHint"),
   checkFn: authApi.checkName,
+  onStatus: (ok) => {
+    nameOk = ok;
+    syncRegBtn();
+  },
 });
+
+const regEmail = document.getElementById("regEmail");
+const regEmailHint = document.getElementById("regEmailHint");
+let emailTimer = null;
+
+regEmail.addEventListener("input", () => {
+  emailOk = false;
+  regEmailHint.textContent = "";
+  regEmailHint.className = "hint";
+  syncRegBtn();
+  clearTimeout(emailTimer);
+  emailTimer = setTimeout(checkEmailField, 400);
+});
+
+async function checkEmailField() {
+  const mail = regEmail.value.trim();
+  if (!mail) {
+    emailOk = false;
+    regEmailHint.textContent = "";
+    syncRegBtn();
+    return;
+  }
+  try {
+    const data = await authApi.checkEmail(mail);
+    if (data.available) {
+      emailOk = true;
+      regEmailHint.textContent = "✓ 邮箱可用";
+      regEmailHint.className = "hint ok";
+    } else {
+      emailOk = false;
+      regEmailHint.textContent = data.error || "该邮箱已被注册";
+      regEmailHint.className = "hint err";
+    }
+  } catch (e) {
+    emailOk = false;
+    regEmailHint.textContent = e.message;
+    regEmailHint.className = "hint err";
+  }
+  syncRegBtn();
+}
 
 function validateRegPass() {
   const p1 = document.getElementById("regPass").value;
   const p2 = document.getElementById("regPass2").value;
   const hint = document.getElementById("regPassHint");
-  const btn = document.getElementById("regBtn");
   if (!p1 || !p2) {
     hint.textContent = "";
-    btn.disabled = true;
+    passOk = false;
+    syncRegBtn();
     return;
   }
   if (p1 !== p2) {
     hint.textContent = "两次密码不一致";
     hint.className = "hint err";
-    btn.disabled = true;
+    passOk = false;
   } else if (p1.length < 6) {
     hint.textContent = "密码至少 6 位";
     hint.className = "hint err";
-    btn.disabled = true;
+    passOk = false;
   } else {
     hint.textContent = "✓ 密码一致";
     hint.className = "hint ok";
-    btn.disabled = false;
+    passOk = true;
   }
+  syncRegBtn();
 }
 
 document.getElementById("regPass").oninput = validateRegPass;
@@ -117,13 +192,18 @@ function goNext(user) {
 }
 
 document.getElementById("regBtn").onclick = async () => {
+  if (!emailOk || !nameOk || !passOk) return;
   try {
     const data = await authApi.register(
-      document.getElementById("regEmail").value.trim(),
+      regEmail.value.trim(),
       document.getElementById("regName").value.trim(),
       document.getElementById("regPass").value
     );
-    goNext(data.user);
+    document.getElementById("panelRegister").innerHTML = `
+      <p class="hint ok">${data.message || "验证邮件已发送，请查收。"}</p>
+      <p class="sub">验证完成后请切换到「登录」标签登录游戏。</p>
+      <button type="button" class="btn-primary" id="gotoLoginBtn">去登录</button>`;
+    document.getElementById("gotoLoginBtn").onclick = () => switchTab("login");
   } catch (e) {
     alert(e.message);
   }

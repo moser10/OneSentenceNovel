@@ -9,6 +9,11 @@ import {
   leavePresence,
   cleanupInactiveChat,
   buildChaptersFromBook,
+  ensureAppSchema,
+  canGenerateChapters,
+  bookCharCount,
+  MIN_CHAPTER_CHARS,
+  MIN_CHAPTERS_COUNT,
 } from "./_shared.js";
 
 export async function onRequest(context) {
@@ -20,6 +25,7 @@ export async function onRequest(context) {
 
   try {
     const db = requireDb(env);
+    await ensureAppSchema(db);
 
     if (request.method === "POST" && action === "check_title") {
       const { title } = await request.json();
@@ -276,6 +282,16 @@ export async function onRequest(context) {
         .all();
 
       const chapters = buildChaptersFromBook(results);
+      if (!chapters.length) {
+        const total = bookCharCount(results);
+        const need = MIN_CHAPTER_CHARS * MIN_CHAPTERS_COUNT;
+        return json(
+          {
+            error: `内容不足，无法分章。至少需要 ${need} 字（每章不少于 ${MIN_CHAPTER_CHARS} 字，且至少 ${MIN_CHAPTERS_COUNT} 章）。当前共 ${total} 字。`,
+          },
+          400
+        );
+      }
       await db
         .prepare("UPDATE stories SET chapters_json = ? WHERE id = ?")
         .bind(JSON.stringify(chapters), story_id)
@@ -319,7 +335,10 @@ export async function onRequest(context) {
       await touchPresence(db, storyId, userId);
       await cleanupInactiveChat(db, storyId);
 
-      const story = await db.prepare("SELECT title, chapters_json FROM stories WHERE id = ?").bind(storyId).first();
+      const story = await db
+        .prepare("SELECT title, chapters_json, invite_code, owner_id FROM stories WHERE id = ?")
+        .bind(storyId)
+        .first();
 
       const { results } = await db
         .prepare(
@@ -340,7 +359,16 @@ export async function onRequest(context) {
         chapters = story?.chapters_json ? JSON.parse(story.chapters_json) : [];
       } catch (_) {}
 
-      return json({ title: story?.title, book, chat, chapters });
+      return json({
+        title: story?.title,
+        invite_code: story?.invite_code,
+        owner_id: story?.owner_id,
+        book,
+        chat,
+        chapters,
+        total_chars: bookCharCount(book),
+        can_chapter: canGenerateChapters(book),
+      });
     }
 
     if (request.method === "POST" && action === "publish") {

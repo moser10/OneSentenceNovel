@@ -1,9 +1,13 @@
-import { corsHeaders, json, requireDb, generateUniqueName } from "./_shared.js";
+import { corsHeaders, json, requireDb, generateUniqueName, ensureAppSchema } from "./_shared.js";
 import { hashPassword, verifyPassword, randomPassword } from "./_crypto.js";
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 async function sendMail(env, to, subject, html) {
-  if (!env.RESEND_API_KEY) return;
-  await fetch("https://api.resend.com/emails", {
+  if (!env.RESEND_API_KEY) {
+    throw new Error("邮件服务未配置（RESEND_API_KEY）");
+  }
+  const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${env.RESEND_API_KEY}`,
@@ -11,6 +15,10 @@ async function sendMail(env, to, subject, html) {
     },
     body: JSON.stringify({ from: "game@1024201.com", to, subject, html }),
   });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(`邮件发送失败 (${res.status})${detail ? `: ${detail.slice(0, 120)}` : ""}`);
+  }
 }
 
 function publicUser(row) {
@@ -19,13 +27,26 @@ function publicUser(row) {
     email: row.email,
     username: row.username,
     must_change_password: !!row.must_change_password,
+    email_verified: row.email_verified !== 0,
   };
+}
+
+function isValidEmail(email) {
+  return EMAIL_RE.test(email);
+}
+
+function siteOrigin(request) {
+  const url = new URL(request.url);
+  if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return url.origin;
+  return "https://www.1024201.com";
 }
 
 async function findUserByEmail(db, email) {
   return db
     .prepare(
-      "SELECT id, email, username, password_hash, password_plain, temp_password, temp_password_expires, must_change_password FROM users WHERE email = ?"
+      `SELECT id, email, username, password_hash, password_plain, temp_password, temp_password_expires,
+              must_change_password, email_verified
+       FROM users WHERE email = ?`
     )
     .bind(email)
     .first();
@@ -50,6 +71,33 @@ export async function onRequest(context) {
 
   try {
     const db = requireDb(env);
+    await ensureAppSchema(db);
+
+    if (request.method === "GET" && action === "verify") {
+      const token = url.searchParams.get("token")?.trim();
+      if (!token) {
+        return Response.redirect(`${siteOrigin(request)}/game/register/?verify=invalid`, 302);
+      }
+      const user = await db
+        .prepare(
+          `SELECT id FROM users
+           WHERE email_verify_token = ?
+             AND email_verified = 0
+             AND (email_verify_expires IS NULL OR email_verify_expires > datetime('now'))`
+        )
+        .bind(token)
+        .first();
+      if (!user) {
+        return Response.redirect(`${siteOrigin(request)}/game/register/?verify=invalid`, 302);
+      }
+      await db
+        .prepare(
+          `UPDATE users SET email_verified = 1, email_verify_token = NULL, email_verify_expires = NULL WHERE id = ?`
+        )
+        .bind(user.id)
+        .run();
+      return Response.redirect(`${siteOrigin(request)}/game/register/?verify=ok`, 302);
+    }
 
     if (request.method === "POST" && action === "check") {
       const { username } = await request.json();
@@ -63,12 +111,22 @@ export async function onRequest(context) {
       return json({ available: true });
     }
 
+    if (request.method === "POST" && action === "check_email") {
+      const { email } = await request.json();
+      const mail = email?.trim();
+      if (!mail) return json({ error: "邮箱不能为空" }, 400);
+      if (!isValidEmail(mail)) return json({ available: false, error: "邮箱格式不正确" });
+      const existing = await db.prepare("SELECT id FROM users WHERE email = ?").bind(mail).first();
+      return json({ available: !existing });
+    }
+
     if (request.method === "POST" && action === "register") {
       const { email, username, password } = await request.json();
       const mail = email?.trim();
       const name = username?.trim();
       const pass = password?.trim();
       if (!mail || !name || !pass) return json({ error: "邮箱、昵称和密码不能为空" }, 400);
+      if (!isValidEmail(mail)) return json({ error: "邮箱格式不正确" }, 400);
       if (pass.length < 6) return json({ error: "密码至少 6 位" }, 400);
 
       if (await db.prepare("SELECT id FROM users WHERE email = ?").bind(mail).first()) {
@@ -79,22 +137,33 @@ export async function onRequest(context) {
       }
 
       const passHash = await hashPassword(pass);
+      const verifyToken = crypto.randomUUID();
       const result = await db
         .prepare(
-          "INSERT INTO users (email, username, password_hash, password_plain) VALUES (?, ?, ?, ?)"
+          `INSERT INTO users (email, username, password_hash, password_plain, email_verified, email_verify_token, email_verify_expires)
+           VALUES (?, ?, ?, ?, 0, ?, datetime('now', '+48 hours'))`
         )
-        .bind(mail, name, passHash, pass)
+        .bind(mail, name, passHash, pass, verifyToken)
         .run();
 
       const today = new Date().toLocaleDateString("zh-CN");
+      const verifyUrl = `${siteOrigin(request)}/api/auth?action=verify&token=${verifyToken}`;
       await sendMail(
         env,
         mail,
-        "欢迎来到 1024201 游戏中心",
-        `<p>欢迎 <strong>${name}</strong> 来到1024201的游戏中心，一票通账号已开通。</p><br><p>落款 1024201<br>${today}</p>`
+        "1024201 游戏中心 · 请验证邮箱",
+        `<p>欢迎 <strong>${name}</strong> 来到1024201的游戏中心，首先验证邮件地址：</p>
+         <p><a href="${verifyUrl}">点击此处验证邮箱</a></p>
+         <p>祝玩儿的开心。</p>
+         <br><p>落款 1024201<br>${today}</p>`
       );
 
-      return json({ success: true, user: { id: result.meta.last_row_id, email: mail, username: name, must_change_password: false } });
+      return json({
+        success: true,
+        verify_sent: true,
+        message: `验证邮件已发送至 ${mail}，请点击邮件中的链接完成验证后再登录。`,
+        user: { id: result.meta.last_row_id, email: mail, username: name, email_verified: false },
+      });
     }
 
     if (request.method === "POST" && action === "login") {
@@ -106,6 +175,9 @@ export async function onRequest(context) {
       const user = await findUserByEmail(db, mail);
       if (!user) return json({ error: "该邮箱尚未注册" }, 404);
       if (!(await verifyUserPassword(user, pass))) return json({ error: "密码错误" }, 401);
+      if (!user.email_verified) {
+        return json({ error: "邮箱尚未验证，请查收注册邮件并点击验证链接" }, 403);
+      }
 
       if (user.temp_password && pass === user.temp_password) {
         await db.prepare("UPDATE users SET must_change_password = 1 WHERE id = ?").bind(user.id).run();

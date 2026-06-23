@@ -13,6 +13,9 @@ const API_ROUTES = {
 
 export default {
   async fetch(request, env, ctx) {
+    const apexRedirect = maybeRedirectApex(request);
+    if (apexRedirect) return apexRedirect;
+
     const url = new URL(request.url);
     const { pathname } = url;
 
@@ -58,4 +61,14 @@ async function serveStatic(request, env) {
   }
 
   return response;
+}
+
+function maybeRedirectApex(request) {
+  const url = new URL(request.url);
+  const host = url.hostname.toLowerCase();
+  if (host === "1024201.com") {
+    url.hostname = "www.1024201.com";
+    return Response.redirect(url.toString(), 301);
+  }
+  return null;
 }

@@ -1,7 +1,36 @@
-import { corsHeaders, json, requireDb } from "./_shared.js";
+import { corsHeaders, json, requireDb, ensureAppSchema } from "./_shared.js";
 import { hashPassword, verifyPassword } from "./_crypto.js";
 
 const SESSION_HOURS = 12;
+
+async function ensureAdminSchema(db) {
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS admin_auth (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        username TEXT NOT NULL DEFAULT 'sa',
+        password_hash TEXT,
+        password_plain TEXT,
+        temp_password TEXT,
+        temp_password_used_at TEXT
+      )`
+    )
+    .run();
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS admin_sessions (
+        token TEXT PRIMARY KEY,
+        expires_at TEXT NOT NULL
+      )`
+    )
+    .run();
+  const row = await db.prepare("SELECT id FROM admin_auth WHERE id = 1").first();
+  if (!row) {
+    await db
+      .prepare("INSERT INTO admin_auth (id, username, password_plain) VALUES (1, 'sa', '1qaz2wsx')")
+      .run();
+  }
+}
 
 async function getAdminRow(db) {
   return db.prepare("SELECT * FROM admin_auth WHERE id = 1").first();
@@ -54,6 +83,8 @@ export async function onRequest(context) {
 
   try {
     const db = requireDb(env);
+    await ensureAdminSchema(db);
+    await ensureAppSchema(db);
 
     if (request.method === "POST" && action === "login") {
       const { username, password } = await request.json();

@@ -1,4 +1,4 @@
-export function bindNameCheck({ input, btn, hint, checkFn }) {
+export function bindNameCheck({ input, btn, hint, checkFn, onStatus }) {
   let timer = null;
 
   const grayBtn = () => {
@@ -7,6 +7,7 @@ export function bindNameCheck({ input, btn, hint, checkFn }) {
     btn.textContent = "推荐可用名";
     delete btn.dataset.v;
     if (hint) hint.textContent = "";
+    onStatus?.(false);
   };
 
   grayBtn();
@@ -22,6 +23,7 @@ export function bindNameCheck({ input, btn, hint, checkFn }) {
         if (data.available) {
           if (hint) hint.textContent = "✓ 可以使用";
           if (hint) hint.className = "hint ok";
+          onStatus?.(true);
         } else {
           if (hint) {
             hint.textContent = "已被占用";
@@ -31,12 +33,14 @@ export function bindNameCheck({ input, btn, hint, checkFn }) {
           btn.dataset.v = data.recommend;
           btn.disabled = false;
           btn.classList.remove("disabled");
+          onStatus?.(false);
         }
       } catch (e) {
         if (hint) {
           hint.textContent = e.message;
           hint.className = "hint err";
         }
+        onStatus?.(false);
       }
     }, 500);
   });

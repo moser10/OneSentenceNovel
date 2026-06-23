@@ -15,29 +15,62 @@ async function api(action, options = {}) {
 
 const app = document.getElementById("app");
 
+function clearLoginFields() {
+  const userEl = document.getElementById("user");
+  const passEl = document.getElementById("pass");
+  if (!userEl || !passEl) return;
+  userEl.value = "";
+  passEl.value = "";
+}
+
+function bindLoginAntiAutofill() {
+  const userEl = document.getElementById("user");
+  const passEl = document.getElementById("pass");
+  userEl.readOnly = true;
+  passEl.readOnly = true;
+  userEl.addEventListener("focus", () => {
+    userEl.readOnly = false;
+  });
+  passEl.addEventListener("focus", () => {
+    passEl.readOnly = false;
+  });
+  clearLoginFields();
+  requestAnimationFrame(clearLoginFields);
+  setTimeout(clearLoginFields, 50);
+}
+
 function renderLogin() {
   app.innerHTML = `
     <div class="wrap">
       <div class="card" style="max-width:360px;margin:40px auto;">
         <h1>gamebgp</h1>
-        <p class="sub">管理后台 · 请在 D1 配置 admin_auth</p>
-        <input id="user" placeholder="用户名" value="sa">
-        <input id="pass" type="password" placeholder="密码">
-        <button id="loginBtn" style="width:100%">登录</button>
+        <p class="sub">管理后台登录</p>
+        <form id="loginForm" autocomplete="off" onsubmit="return false">
+          <input type="text" tabindex="-1" aria-hidden="true" class="login-trap" autocomplete="username">
+          <input type="password" tabindex="-1" aria-hidden="true" class="login-trap" autocomplete="current-password">
+          <input id="user" name="gbp-user" type="text" placeholder="用户名" autocomplete="off" inputmode="text" spellcheck="false">
+          <input id="pass" name="gbp-pass" type="password" placeholder="密码" autocomplete="new-password">
+          <button id="loginBtn" type="button" style="width:100%">登录</button>
+        </form>
       </div>
     </div>`;
+  bindLoginAntiAutofill();
   document.getElementById("loginBtn").onclick = async () => {
+    const userEl = document.getElementById("user");
+    const passEl = document.getElementById("pass");
+    const username = userEl.value.trim();
+    const password = passEl.value;
+    clearLoginFields();
     try {
       const data = await api("login", {
         method: "POST",
-        body: JSON.stringify({
-          username: document.getElementById("user").value.trim(),
-          password: document.getElementById("pass").value,
-        }),
+        body: JSON.stringify({ username, password }),
       });
+      clearLoginFields();
       sessionStorage.setItem(TOKEN_KEY, data.token);
       renderDashboard();
     } catch (e) {
+      clearLoginFields();
       alert(e.message);
     }
   };
@@ -50,7 +83,7 @@ async function renderDashboard() {
     app.innerHTML = `
       <div class="wrap">
         <h1>gamebgp 数据管理</h1>
-        <p class="sub">临时密码请在 D1 → admin_auth 表更新 temp_password 列，使用后 24 小时内有效</p>
+        <p class="sub"><button class="btn-small" id="logoutBtn">退出登录</button> · 临时密码在 D1 admin_auth.temp_password 配置</p>
         <div class="card">
           <h2>一票通用户</h2>
           <table>
@@ -96,6 +129,8 @@ async function renderDashboard() {
         </div>
       </div>`;
 
+    document.getElementById("logoutBtn").onclick = logoutAdmin;
+
     document.querySelectorAll(".eye").forEach((eye) => {
       eye.onclick = () => {
         const mask = eye.previousElementSibling;
@@ -125,6 +160,17 @@ async function renderDashboard() {
     renderLogin();
   }
 }
+
+function logoutAdmin() {
+  sessionStorage.removeItem(TOKEN_KEY);
+  renderLogin();
+}
+
+window.addEventListener("pageshow", () => {
+  if (sessionStorage.getItem(TOKEN_KEY)) return;
+  if (document.getElementById("user")) clearLoginFields();
+  else renderLogin();
+});
 
 if (sessionStorage.getItem(TOKEN_KEY)) renderDashboard();
 else renderLogin();

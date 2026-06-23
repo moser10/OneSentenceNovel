@@ -44,7 +44,7 @@ textarea { min-height: 72px; resize: vertical; }
 .btn-secondary { background: #e5e5ea; color: #007aff; padding: 12px 14px; white-space: nowrap; }
 .btn-small { padding: 8px 12px; font-size: 13px; }
 .btn-primary:hover, .btn-secondary:hover, .btn-small:hover { opacity: 0.85; }
-.btn-secondary.disabled, .btn-secondary:disabled { opacity: 0.4; cursor: default; }
+.btn-primary:disabled, .btn-secondary.disabled, .btn-secondary:disabled, .btn-small:disabled { opacity: 0.4; cursor: default; }
 .hint { font-size: 12px; margin-top: 4px; min-height: 18px; }
 .hint.ok { color: #34c759; }
 .hint.warn { color: #ff9500; }
@@ -89,6 +89,33 @@ hr { border: none; border-top: 1px solid #eee; margin: 20px 0; }
 .compose textarea { margin-bottom: 10px; }
 .todo-section { background: #f8f9ff; margin: -8px -8px 0; padding: 16px; border-radius: 10px; }
 .game-brand { font-size: 12px; color: #8e8e93; letter-spacing: 0.5px; margin-bottom: 4px; }
+.game-brand-zh { margin-bottom: 6px; }
+.share-code { font-family: ui-monospace, monospace; background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+.user-menu-wrap { position: relative; }
+.user-menu-btn { cursor: pointer; border: none; font: inherit; }
+.user-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: #fff;
+  border: 1px solid #e5e5ea;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  z-index: 10;
+  min-width: 120px;
+  overflow: hidden;
+}
+.user-menu button {
+  display: block;
+  width: 100%;
+  padding: 10px 14px;
+  border: none;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+}
+.user-menu button:hover { background: #f2f2f7; }
 .todo-group { margin-bottom: 12px; }
 .book-title { text-align: center; margin-bottom: 16px; font-size: 20px; }
 .toc-box { background: #f8f8f8; padding: 12px; border-radius: 8px; margin-bottom: 12px; font-size: 14px; }

@@ -5,9 +5,11 @@ import { getUser, getRoom } from "../../js/store.js";
 let pollTimer = null;
 let heartbeatTimer = null;
 let bookTitle = "";
+let savedTitle = "";
 let chapters = [];
+let canChapter = false;
 
-export function renderPlay(app, onLeave) {
+export function renderPlay(app, onLeave, game) {
   const user = getUser();
   const room = getRoom();
   if (!room?.id) return onLeave();
@@ -16,7 +18,8 @@ export function renderPlay(app, onLeave) {
     <div class="card">
       <div class="header-row">
         <div>
-          <p class="game-brand">One Sentence Novel</p>
+          <p class="game-brand">${game.nameEn}</p>
+          <p class="game-brand game-brand-zh">${game.nameZh}</p>
           <h1 id="roomTitle">${room.title}</h1>
           <p class="sub" id="roomMeta"></p>
         </div>
@@ -30,14 +33,14 @@ export function renderPlay(app, onLeave) {
           <button type="button" id="renameSuggest" class="btn-secondary disabled" disabled>推荐</button>
         </div>
         <p id="renameHint" class="hint"></p>
-        <button id="renameBtn" class="btn-secondary btn-small">保存书名</button>
+        <button id="renameBtn" class="btn-secondary btn-small" disabled>保存书名</button>
       </section>
 
       <section class="section book-section">
         <div class="section-head">
           <h2>📖 共享写书</h2>
           <div class="row" style="margin:0;">
-            <button id="chapterBtn" class="btn-secondary btn-small">自动分章</button>
+            <button id="chapterBtn" class="btn-secondary btn-small disabled" disabled title="至少 400 字才可分章">自动分章</button>
             <button id="pdfBtn" class="btn-secondary btn-small">下载 PDF</button>
           </div>
         </div>
@@ -60,24 +63,36 @@ export function renderPlay(app, onLeave) {
       </section>
     </div>`;
 
+  const renameInput = document.getElementById("renameInput");
+  const renameBtn = document.getElementById("renameBtn");
+
+  function syncRenameBtn() {
+    const next = renameInput.value.trim();
+    const unchanged = !next || next === savedTitle;
+    renameBtn.disabled = unchanged;
+    renameBtn.classList.toggle("disabled", unchanged);
+  }
+
   if (room.role === "owner") {
     document.getElementById("ownerRename").hidden = false;
     bindNameCheck({
-      input: document.getElementById("renameInput"),
+      input: renameInput,
       btn: document.getElementById("renameSuggest"),
       hint: document.getElementById("renameHint"),
       checkFn: roomApi.checkTitle,
     });
-    document.getElementById("renameBtn").onclick = async () => {
-      const title = document.getElementById("renameInput").value.trim();
-      if (!title) return;
+    renameInput.oninput = syncRenameBtn;
+    renameBtn.onclick = async () => {
+      const title = renameInput.value.trim();
+      if (!title || title === savedTitle) return;
       try {
         await roomApi.updateTitle(room.id, user.id, title);
         room.title = title;
         bookTitle = title;
+        savedTitle = title;
         document.getElementById("roomTitle").textContent = title;
+        syncRenameBtn();
         await refresh();
-        alert("书名已更新");
       } catch (e) {
         alert(e.message);
       }
@@ -103,12 +118,14 @@ export function renderPlay(app, onLeave) {
 
   document.getElementById("chatBtn").onclick = () => publish("chat");
   document.getElementById("bookBtn").onclick = () => publish("book");
-  document.getElementById("chapterBtn").onclick = async () => {
+
+  const chapterBtn = document.getElementById("chapterBtn");
+  chapterBtn.onclick = async () => {
+    if (chapterBtn.disabled) return;
     try {
       const data = await roomApi.generateChapters(room.id, user.id);
       chapters = data.chapters || [];
       renderToc();
-      alert(`已生成 ${chapters.length} 个章节`);
     } catch (e) {
       alert(e.message);
     }
@@ -131,6 +148,12 @@ export function renderPlay(app, onLeave) {
     }
   }
 
+  function syncChapterBtn() {
+    chapterBtn.disabled = !canChapter;
+    chapterBtn.classList.toggle("disabled", !canChapter);
+    chapterBtn.title = canChapter ? "按每章至少 200 字自动分章" : "至少 400 字才可分章（每章不少于 200 字）";
+  }
+
   function renderToc() {
     const box = document.getElementById("tocBox");
     if (!chapters.length) {
@@ -145,14 +168,30 @@ export function renderPlay(app, onLeave) {
     try {
       const data = await roomApi.content(room.id, user.id);
       bookTitle = data.title || room.title;
+      savedTitle = bookTitle;
+      if (room.role === "owner") {
+        renameInput.value = bookTitle;
+        syncRenameBtn();
+      }
+      if (data.invite_code) room.invite_code = data.invite_code;
       chapters = data.chapters || [];
+      canChapter = !!data.can_chapter;
+      syncChapterBtn();
       renderBook(data.book);
       renderChat(data.chat);
       renderToc();
-      document.getElementById("roomMeta").textContent = `《${bookTitle}》· 共 ${data.book.length} 句 · @${user.username}`;
+      updateRoomMeta(data);
     } catch (e) {
       document.getElementById("bookWindow").innerHTML = `<p class="hint err">${e.message}</p>`;
     }
+  }
+
+  function updateRoomMeta(data) {
+    const parts = [`《${bookTitle}》`, `共 ${data.book.length} 句`, `@${user.username}`];
+    if (room.role === "owner" && (room.invite_code || data.invite_code)) {
+      parts.push(`分享码 ${room.invite_code || data.invite_code}`);
+    }
+    document.getElementById("roomMeta").textContent = parts.join(" · ");
   }
 
   function renderBook(items) {

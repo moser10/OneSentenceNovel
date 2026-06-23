@@ -1,18 +1,26 @@
 import { authApi, roomApi } from "./api.js";
 import { bindNameCheck } from "./nameCheck.js";
-import { getUser, setUser, setRoom } from "../../js/store.js";
+import { getUser, setUser, setRoom, clearRoom, clearUser } from "../../js/store.js";
 
-export function renderLobby(app, onEnterRoom) {
+export function renderLobby(app, onEnterRoom, game) {
   const user = getUser();
   let todoTimer = null;
 
   app.innerHTML = `
     <div class="card">
       <div class="header-row">
-        <h1>大厅</h1>
-        <div class="row" style="margin:0;">
-          <span class="badge">@${user.username}</span>
-          <button id="leaveLobbyBtn" class="btn-secondary btn-small">返回游戏中心</button>
+        <div>
+          <p class="game-brand">${game.nameEn}</p>
+          <h1>${game.lobbyTitle}</h1>
+        </div>
+        <div class="row" style="margin:0;flex-wrap:wrap;justify-content:flex-end;">
+          <div class="user-menu-wrap">
+            <button type="button" id="userMenuBtn" class="badge user-menu-btn">@${user.username}</button>
+            <div id="userMenu" class="user-menu" hidden>
+              <button type="button" id="logoutBtn">退出登录</button>
+            </div>
+          </div>
+          <button type="button" id="leaveLobbyBtn" class="btn-secondary btn-small">返回游戏中心</button>
         </div>
       </div>
 
@@ -62,6 +70,24 @@ export function renderLobby(app, onEnterRoom) {
       </section>
     </div>`;
 
+  const userMenuBtn = document.getElementById("userMenuBtn");
+  const userMenu = document.getElementById("userMenu");
+  userMenuBtn.onclick = (e) => {
+    e.stopPropagation();
+    userMenu.hidden = !userMenu.hidden;
+  };
+  document.addEventListener("click", (e) => {
+    if (!userMenu.contains(e.target) && e.target !== userMenuBtn) {
+      userMenu.hidden = true;
+    }
+  });
+  document.getElementById("logoutBtn").onclick = () => {
+    clearInterval(todoTimer);
+    clearRoom();
+    clearUser();
+    window.location.href = "/game/register/";
+  };
+
   document.getElementById("leaveLobbyBtn").onclick = () => {
     clearInterval(todoTimer);
     clearRoom();
@@ -80,7 +106,12 @@ export function renderLobby(app, onEnterRoom) {
     if (!title) return alert("请输入书名");
     try {
       const data = await roomApi.create(title, user.id);
-      enterRoom({ id: data.story_id, title: data.title, invite_code: data.invite_code, role: "owner" });
+      enterRoom({
+        id: data.story_id,
+        title: data.title,
+        invite_code: data.invite_code,
+        role: "owner",
+      });
     } catch (e) {
       if (e.data?.recommend) {
         document.getElementById("titleHint").textContent = `已被占用，可点推荐名`;
@@ -99,7 +130,12 @@ export function renderLobby(app, onEnterRoom) {
     if (!code) return alert("请输入邀请码");
     try {
       const data = await roomApi.joinByCode(code, user.id);
-      enterRoom({ id: data.story.id, title: data.story.title, role: "member" });
+      enterRoom({
+        id: data.story.id,
+        title: data.story.title,
+        invite_code: code.toUpperCase(),
+        role: "member",
+      });
     } catch (e) {
       alert(e.message);
     }
@@ -128,7 +164,11 @@ export function renderLobby(app, onEnterRoom) {
             .map(
               (r) => `
           <div class="list-item">
-            <div><strong>${r.title}</strong> · 房主 ${r.owner_name} ${joinStatusLabel(r)}</div>
+            <div>
+              <strong>${r.title}</strong><br>
+              <span class="sub">房主 ${r.owner_name} · 分享码 <code class="share-code">${r.invite_code}</code></span>
+              ${joinStatusLabel(r)}
+            </div>
             ${joinActionHtml(r)}
           </div>`
             )
@@ -306,8 +346,11 @@ export function renderLobby(app, onEnterRoom) {
         .map(
           (r) => `
         <div class="list-item">
-          <div><strong>${r.title}</strong> ${r.role === "owner" ? "（房主）" : ""}</div>
-          <button data-id="${r.id}" data-title="${r.title}" data-role="${r.role}" class="btn-small enter-btn">进入房间</button>
+          <div>
+            <strong>${r.title}</strong> ${r.role === "owner" ? "（房主）" : ""}
+            ${r.role === "owner" && r.invite_code ? `<br><span class="sub">分享码 <code class="share-code">${r.invite_code}</code></span>` : ""}
+          </div>
+          <button data-id="${r.id}" data-title="${r.title}" data-role="${r.role}" data-code="${r.invite_code || ""}" class="btn-small enter-btn">进入房间</button>
         </div>`
         )
         .join("");
@@ -317,6 +360,7 @@ export function renderLobby(app, onEnterRoom) {
             id: Number(btn.dataset.id),
             title: btn.dataset.title,
             role: btn.dataset.role,
+            invite_code: btn.dataset.code || undefined,
           });
       });
     } catch (e) {

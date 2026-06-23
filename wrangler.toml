@@ -12,3 +12,12 @@ binding = "ASSETS"
 binding = "DB"
 database_name = "onesentencenovel"
 database_id = "1c4cce8e-c510-450d-8277-80b29d415c4b"
+
+# 根域与 www 都指向 Worker；根域在 worker.js 内 301 到 www
+[[routes]]
+pattern = "www.1024201.com/*"
+zone_name = "1024201.com"
+
+[[routes]]
+pattern = "1024201.com/*"
+zone_name = "1024201.com"

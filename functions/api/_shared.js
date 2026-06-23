@@ -21,6 +21,49 @@ export function requireDb(env) {
   return env.DB;
 }
 
+async function hasColumn(db, table, column) {
+  const { results } = await db.prepare(`PRAGMA table_info(${table})`).all();
+  return results.some((row) => row.name === column);
+}
+
+async function ensureColumn(db, table, column, alterSql) {
+  if (await hasColumn(db, table, column)) return;
+  await db.prepare(alterSql).run();
+}
+
+export async function ensureAppSchema(db) {
+  await ensureColumn(db, "stories", "game_id", "ALTER TABLE stories ADD COLUMN game_id TEXT NOT NULL DEFAULT 'osn'");
+  await ensureColumn(db, "stories", "chapters_json", "ALTER TABLE stories ADD COLUMN chapters_json TEXT");
+  await ensureColumn(db, "users", "password_hash", "ALTER TABLE users ADD COLUMN password_hash TEXT");
+  await ensureColumn(db, "users", "password_plain", "ALTER TABLE users ADD COLUMN password_plain TEXT");
+  await ensureColumn(
+    db,
+    "users",
+    "must_change_password",
+    "ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0"
+  );
+  await ensureColumn(db, "users", "temp_password", "ALTER TABLE users ADD COLUMN temp_password TEXT");
+  await ensureColumn(db, "users", "temp_password_expires", "ALTER TABLE users ADD COLUMN temp_password_expires TEXT");
+  await ensureColumn(
+    db,
+    "users",
+    "email_verified",
+    "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1"
+  );
+  await ensureColumn(db, "users", "email_verify_token", "ALTER TABLE users ADD COLUMN email_verify_token TEXT");
+  await ensureColumn(db, "users", "email_verify_expires", "ALTER TABLE users ADD COLUMN email_verify_expires TEXT");
+  await db
+    .prepare(
+      `CREATE TABLE IF NOT EXISTS room_presence (
+        story_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        last_seen TEXT NOT NULL,
+        PRIMARY KEY (story_id, user_id)
+      )`
+    )
+    .run();
+}
+
 export async function generateUniqueName(db, baseName, table, column) {
   let finalName = "";
   for (let i = 0; i < 20; i++) {
@@ -76,9 +119,24 @@ export async function cleanupInactiveChat(db, storyId) {
   }
 }
 
-const CHAPTER_CHARS = 3000;
+const MAX_CHAPTER_CHARS = 3000;
+export const MIN_CHAPTER_CHARS = 200;
+export const MIN_CHAPTERS_COUNT = 2;
+
+export function bookCharCount(bookItems) {
+  return bookItems.reduce((sum, item) => sum + (item.text?.length || 0), 0);
+}
+
+export function canGenerateChapters(bookItems) {
+  return Math.floor(bookCharCount(bookItems) / MIN_CHAPTER_CHARS) >= MIN_CHAPTERS_COUNT;
+}
 
 export function buildChaptersFromBook(bookItems) {
+  const total = bookCharCount(bookItems);
+  if (!canGenerateChapters(bookItems)) return [];
+
+  const chapterCount = Math.floor(total / MIN_CHAPTER_CHARS);
+  const targetSize = total / chapterCount;
   const chapters = [];
   let bucket = [];
   let chars = 0;
@@ -98,11 +156,23 @@ export function buildChaptersFromBook(bookItems) {
   };
 
   for (const item of bookItems) {
-    const len = item.text.length;
-    if (chars + len > CHAPTER_CHARS && bucket.length) flush();
     bucket.push(item);
-    chars += len;
+    chars += item.text.length;
+
+    if (chars > MAX_CHAPTER_CHARS && bucket.length > 1) {
+      const last = bucket.pop();
+      chars -= last.text.length;
+      flush();
+      bucket.push(last);
+      chars += last.text.length;
+    }
+
+    const chaptersLeft = chapterCount - chapters.length;
+    if (chaptersLeft > 1 && chars >= targetSize && chars >= MIN_CHAPTER_CHARS) {
+      flush();
+    }
   }
   flush();
-  return chapters;
+
+  return chapters.length >= MIN_CHAPTERS_COUNT ? chapters : [];
 }
