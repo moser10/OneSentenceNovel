@@ -33,6 +33,16 @@ const params = new URLSearchParams(location.search);
 const returnTo = params.get("return") || "/game/";
 const verifyStatus = params.get("verify");
 
+// #region agent log
+function clientLog(message, data, hypothesisId) {
+  fetch("http://127.0.0.1:7725/ingest/bcf84f0a-61b7-4397-82c3-0d4511165217", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "484ab6" },
+    body: JSON.stringify({ sessionId: "484ab6", location: "register/auth.js", message, data, hypothesisId, timestamp: Date.now(), runId: "register-debug" }),
+  }).catch(() => {});
+}
+// #endregion
+
 const app = document.getElementById("app");
 
 function renderShell() {
@@ -81,7 +91,9 @@ function showVerifyBanner() {
     box.innerHTML = `<p class="hint ok">邮箱验证成功，请登录。</p>`;
     switchTab("login");
   } else if (verifyStatus === "invalid") {
-    box.innerHTML = `<p class="hint err">验证链接无效或已过期，请重新注册或联系管理员。</p>`;
+    box.innerHTML = `<p class="hint err">验证链接无效或已过期，请重新注册。</p>`;
+  } else if (verifyStatus === "conflict") {
+    box.innerHTML = `<p class="hint err">验证时昵称已被他人占用，请重新注册并换一个昵称。</p>`;
   }
 }
 
@@ -193,18 +205,31 @@ function goNext(user) {
 
 document.getElementById("regBtn").onclick = async () => {
   if (!emailOk || !nameOk || !passOk) return;
+  let health = {};
+  try {
+    health = await fetch("/api/health").then((r) => r.json());
+    // #region agent log
+    clientLog("health before register", { hasResendKey: health.hasResendKey, registerFlow: health.registerFlow, worker: health.worker }, "A");
+    // #endregion
+  } catch (_) {}
   try {
     const data = await authApi.register(
       regEmail.value.trim(),
       document.getElementById("regName").value.trim(),
       document.getElementById("regPass").value
     );
+    // #region agent log
+    clientLog("register success", { verify_sent: !!data.verify_sent }, "E");
+    // #endregion
     document.getElementById("panelRegister").innerHTML = `
       <p class="hint ok">${data.message || "验证邮件已发送，请查收。"}</p>
       <p class="sub">验证完成后请切换到「登录」标签登录游戏。</p>
       <button type="button" class="btn-primary" id="gotoLoginBtn">去登录</button>`;
     document.getElementById("gotoLoginBtn").onclick = () => switchTab("login");
   } catch (e) {
+    // #region agent log
+    clientLog("register error", { error: e.message, healthHasResend: health.hasResendKey, healthFlow: health.registerFlow }, "B");
+    // #endregion
     alert(e.message);
   }
 };

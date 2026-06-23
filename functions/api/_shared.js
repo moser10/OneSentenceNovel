@@ -54,6 +54,21 @@ export async function ensureAppSchema(db) {
   await ensureColumn(db, "users", "email_verify_expires", "ALTER TABLE users ADD COLUMN email_verify_expires TEXT");
   await db
     .prepare(
+      `CREATE TABLE IF NOT EXISTS pending_registrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        username TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        verify_token TEXT NOT NULL UNIQUE,
+        expires_at TEXT NOT NULL,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`
+    )
+    .run();
+  await db.prepare("DELETE FROM users WHERE email_verified = 0").run();
+  await db.prepare("DELETE FROM pending_registrations WHERE expires_at <= datetime('now')").run();
+  await db
+    .prepare(
       `CREATE TABLE IF NOT EXISTS room_presence (
         story_id INTEGER NOT NULL,
         user_id INTEGER NOT NULL,

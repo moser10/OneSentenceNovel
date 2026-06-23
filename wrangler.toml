@@ -1,5 +1,5 @@
-# 必须与 Cloudflare Workers Builds 里连接的 Worker 名称一致（onesentencenovel）
-name = "onesentencenovel"
+# Worker 名称必须与 Cloudflare 控制台里实际接域名的 Worker 一致
+name = "one-sentence-novel"
 main = "worker.js"
 compatibility_date = "2024-09-23"
 workers_dev = false
@@ -8,13 +8,12 @@ workers_dev = false
 directory = "."
 binding = "ASSETS"
 
-# Git 部署 (npx wrangler deploy) 必须在 wrangler.toml 声明 D1，仅控制台绑定可能不生效
+# D1：database_id 是绑定关键；database_name 填控制台显示的数据库名
 [[d1_databases]]
 binding = "DB"
-database_name = "onesentencenovel"
+database_name = "one-sentence-novel"
 database_id = "1c4cce8e-c510-450d-8277-80b29d415c4b"
 
-# 自定义域名请在 Cloudflare 控制台配置，不要写在这里：
-# Workers → onesentencenovel → Settings → Domains & Routes
-# （wrangler.toml 里的 [[routes]] 会与已绑定到其它 Worker 的路由冲突，导致 CI 部署失败）
-# 根域 1024201.com 在 worker.js 内 301 到 www.1024201.com
+# 自定义域名在控制台配置：Workers → one-sentence-novel → Domains & Routes
+# RESEND_API_KEY 也配在这个 Worker 的 Variables (Secret) 里
+# Git Builds 请连接同一个 Worker 名称 one-sentence-novel，不要用 onesentencenovel

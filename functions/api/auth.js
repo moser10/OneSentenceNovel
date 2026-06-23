@@ -3,9 +3,21 @@ import { hashPassword, verifyPassword, randomPassword } from "./_crypto.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// #region agent log
+function agentLog(location, message, data, hypothesisId) {
+  const payload = { sessionId: "484ab6", location, message, data, hypothesisId, timestamp: Date.now(), runId: "register-debug" };
+  console.log("[agent]", JSON.stringify(payload));
+  fetch("http://127.0.0.1:7725/ingest/bcf84f0a-61b7-4397-82c3-0d4511165217", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "484ab6" },
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+}
+// #endregion
+
 async function sendMail(env, to, subject, html) {
   if (!env.RESEND_API_KEY) {
-    throw new Error("邮件服务未配置（RESEND_API_KEY）");
+    throw new Error("邮件服务未配置（RESEND_API_KEY）。请在 Cloudflare → Workers → one-sentence-novel → Settings → Variables 添加 Secret。");
   }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -27,7 +39,7 @@ function publicUser(row) {
     email: row.email,
     username: row.username,
     must_change_password: !!row.must_change_password,
-    email_verified: row.email_verified !== 0,
+    email_verified: true,
   };
 }
 
@@ -50,6 +62,22 @@ async function findUserByEmail(db, email) {
     )
     .bind(email)
     .first();
+}
+
+async function emailTaken(db, email) {
+  if (await db.prepare("SELECT id FROM users WHERE email = ?").bind(email).first()) return true;
+  return !!(await db
+    .prepare("SELECT id FROM pending_registrations WHERE email = ? AND expires_at > datetime('now')")
+    .bind(email)
+    .first());
+}
+
+async function usernameTaken(db, username) {
+  if (await db.prepare("SELECT id FROM users WHERE username = ?").bind(username).first()) return true;
+  return !!(await db
+    .prepare("SELECT id FROM pending_registrations WHERE username = ? AND expires_at > datetime('now')")
+    .bind(username)
+    .first());
 }
 
 async function verifyUserPassword(user, password) {
@@ -78,24 +106,37 @@ export async function onRequest(context) {
       if (!token) {
         return Response.redirect(`${siteOrigin(request)}/game/register/?verify=invalid`, 302);
       }
-      const user = await db
+
+      const pending = await db
         .prepare(
-          `SELECT id FROM users
-           WHERE email_verify_token = ?
-             AND email_verified = 0
-             AND (email_verify_expires IS NULL OR email_verify_expires > datetime('now'))`
+          `SELECT * FROM pending_registrations
+           WHERE verify_token = ? AND expires_at > datetime('now')`
         )
         .bind(token)
         .first();
-      if (!user) {
+
+      if (!pending) {
         return Response.redirect(`${siteOrigin(request)}/game/register/?verify=invalid`, 302);
       }
+
+      if (await db.prepare("SELECT id FROM users WHERE email = ?").bind(pending.email).first()) {
+        await db.prepare("DELETE FROM pending_registrations WHERE id = ?").bind(pending.id).run();
+        return Response.redirect(`${siteOrigin(request)}/game/register/?verify=ok`, 302);
+      }
+      if (await db.prepare("SELECT id FROM users WHERE username = ?").bind(pending.username).first()) {
+        await db.prepare("DELETE FROM pending_registrations WHERE id = ?").bind(pending.id).run();
+        return Response.redirect(`${siteOrigin(request)}/game/register/?verify=conflict`, 302);
+      }
+
       await db
         .prepare(
-          `UPDATE users SET email_verified = 1, email_verify_token = NULL, email_verify_expires = NULL WHERE id = ?`
+          `INSERT INTO users (email, username, password_hash, email_verified)
+           VALUES (?, ?, ?, 1)`
         )
-        .bind(user.id)
+        .bind(pending.email, pending.username, pending.password_hash)
         .run();
+      await db.prepare("DELETE FROM pending_registrations WHERE id = ?").bind(pending.id).run();
+
       return Response.redirect(`${siteOrigin(request)}/game/register/?verify=ok`, 302);
     }
 
@@ -103,8 +144,7 @@ export async function onRequest(context) {
       const { username } = await request.json();
       const name = username?.trim();
       if (!name) return json({ error: "昵称不能为空" }, 400);
-      const existing = await db.prepare("SELECT id FROM users WHERE username = ?").bind(name).first();
-      if (existing) {
+      if (await usernameTaken(db, name)) {
         const recommend = await generateUniqueName(db, name, "users", "username");
         return json({ available: false, recommend });
       }
@@ -116,8 +156,7 @@ export async function onRequest(context) {
       const mail = email?.trim();
       if (!mail) return json({ error: "邮箱不能为空" }, 400);
       if (!isValidEmail(mail)) return json({ available: false, error: "邮箱格式不正确" });
-      const existing = await db.prepare("SELECT id FROM users WHERE email = ?").bind(mail).first();
-      return json({ available: !existing });
+      return json({ available: !(await emailTaken(db, mail)) });
     }
 
     if (request.method === "POST" && action === "register") {
@@ -125,44 +164,84 @@ export async function onRequest(context) {
       const mail = email?.trim();
       const name = username?.trim();
       const pass = password?.trim();
+      // #region agent log
+      agentLog("auth.js:register:entry", "register started", {
+        hasResendKey: !!env.RESEND_API_KEY,
+        mailDomain: mail?.split("@")[1] || null,
+      }, "B");
+      // #endregion
       if (!mail || !name || !pass) return json({ error: "邮箱、昵称和密码不能为空" }, 400);
       if (!isValidEmail(mail)) return json({ error: "邮箱格式不正确" }, 400);
       if (pass.length < 6) return json({ error: "密码至少 6 位" }, 400);
 
-      if (await db.prepare("SELECT id FROM users WHERE email = ?").bind(mail).first()) {
+      const inUsers = await db.prepare("SELECT id FROM users WHERE email = ?").bind(mail).first();
+      const inPending = await db
+        .prepare("SELECT id FROM pending_registrations WHERE email = ? AND expires_at > datetime('now')")
+        .bind(mail)
+        .first();
+      // #region agent log
+      agentLog("auth.js:register:dup-check", "duplicate check", { inUsers: !!inUsers, inPending: !!inPending }, "C");
+      // #endregion
+
+      if (inUsers) {
         return json({ error: "该邮箱已被注册" }, 400);
       }
       if (await db.prepare("SELECT id FROM users WHERE username = ?").bind(name).first()) {
         return json({ error: "该昵称已被占用" }, 400);
       }
+      const pendingName = await db
+        .prepare(
+          `SELECT email FROM pending_registrations
+           WHERE username = ? AND expires_at > datetime('now') AND email != ?`
+        )
+        .bind(name, mail)
+        .first();
+      if (pendingName) {
+        return json({ error: "该昵称已被占用" }, 400);
+      }
 
       const passHash = await hashPassword(pass);
       const verifyToken = crypto.randomUUID();
-      const result = await db
+
+      await db.prepare("DELETE FROM pending_registrations WHERE email = ?").bind(mail).run();
+      await db
         .prepare(
-          `INSERT INTO users (email, username, password_hash, password_plain, email_verified, email_verify_token, email_verify_expires)
-           VALUES (?, ?, ?, ?, 0, ?, datetime('now', '+48 hours'))`
+          `INSERT INTO pending_registrations (email, username, password_hash, verify_token, expires_at)
+           VALUES (?, ?, ?, ?, datetime('now', '+48 hours'))`
         )
-        .bind(mail, name, passHash, pass, verifyToken)
+        .bind(mail, name, passHash, verifyToken)
         .run();
+      // #region agent log
+      agentLog("auth.js:register:pending-inserted", "pending row created", { tokenLen: verifyToken.length }, "D");
+      // #endregion
 
       const today = new Date().toLocaleDateString("zh-CN");
       const verifyUrl = `${siteOrigin(request)}/api/auth?action=verify&token=${verifyToken}`;
-      await sendMail(
-        env,
-        mail,
-        "1024201 游戏中心 · 请验证邮箱",
-        `<p>欢迎 <strong>${name}</strong> 来到1024201的游戏中心，首先验证邮件地址：</p>
-         <p><a href="${verifyUrl}">点击此处验证邮箱</a></p>
-         <p>祝玩儿的开心。</p>
-         <br><p>落款 1024201<br>${today}</p>`
-      );
+      try {
+        await sendMail(
+          env,
+          mail,
+          "1024201 游戏中心 · 请验证邮箱",
+          `<p>欢迎 <strong>${name}</strong> 来到1024201的游戏中心，首先验证邮件地址：</p>
+           <p><a href="${verifyUrl}">点击此处验证邮箱</a></p>
+           <p>祝玩儿的开心。</p>
+           <br><p>落款 1024201<br>${today}</p>`
+        );
+        // #region agent log
+        agentLog("auth.js:register:mail-ok", "sendMail succeeded", {}, "B");
+        // #endregion
+      } catch (err) {
+        await db.prepare("DELETE FROM pending_registrations WHERE verify_token = ?").bind(verifyToken).run();
+        // #region agent log
+        agentLog("auth.js:register:mail-fail", "sendMail failed, pending rolled back", { err: err.message?.slice(0, 80) }, "D");
+        // #endregion
+        throw err;
+      }
 
       return json({
         success: true,
         verify_sent: true,
-        message: `验证邮件已发送至 ${mail}，请点击邮件中的链接完成验证后再登录。`,
-        user: { id: result.meta.last_row_id, email: mail, username: name, email_verified: false },
+        message: `验证邮件已发送至 ${mail}，请点击邮件中的链接完成注册后再登录。`,
       });
     }
 
@@ -172,12 +251,17 @@ export async function onRequest(context) {
       const pass = password?.trim();
       if (!mail || !pass) return json({ error: "邮箱和密码不能为空" }, 400);
 
+      const pending = await db
+        .prepare("SELECT id FROM pending_registrations WHERE email = ? AND expires_at > datetime('now')")
+        .bind(mail)
+        .first();
+      if (pending) {
+        return json({ error: "注册尚未完成，请查收验证邮件并点击链接后再登录" }, 403);
+      }
+
       const user = await findUserByEmail(db, mail);
       if (!user) return json({ error: "该邮箱尚未注册" }, 404);
       if (!(await verifyUserPassword(user, pass))) return json({ error: "密码错误" }, 401);
-      if (!user.email_verified) {
-        return json({ error: "邮箱尚未验证，请查收注册邮件并点击验证链接" }, 403);
-      }
 
       if (user.temp_password && pass === user.temp_password) {
         await db.prepare("UPDATE users SET must_change_password = 1 WHERE id = ?").bind(user.id).run();
