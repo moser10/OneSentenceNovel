@@ -1,16 +1,16 @@
-# syncNote / 同步便笺
+# 文本中转站 / Text Relay
 
 ## 功能 | Features
 
 **中文**
 
-syncNote 是一个临时中转站，方便你在不同终端之间传递文本或链接。
+文本中转站是一个临时中转工具，方便你在不同终端之间传递文本或链接。
 
 在终端 A 把目标内容放进输入框，终端 B 用**同一账号**登录后即可复制粘贴，无需改格式、不用重新选中或处理换行。最多提供 **3 个独立输入框**，可同时进行多段内容的中转。每个输入框都有**复制、粘贴、删除**三个按钮。用完点**删除**，该框内容即被清空，可继续下一段中转。
 
 **English**
 
-syncNote is a temporary relay for moving text or links between your devices.
+Text Relay is a temporary relay for moving text or links between your devices.
 
 On device A, put the content in a field. On device B, sign in with the **same account** and copy or paste—no reformatting or re-selection needed. There are **3 independent fields** for parallel relays. Each field has **Copy**, **Paste**, and **Delete**. Tap **Delete** when done to clear that field for the next relay.
 

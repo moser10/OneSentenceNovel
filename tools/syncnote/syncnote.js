@@ -2,14 +2,15 @@ import { getPortalLang, mountLangTabs } from "/js/langTabs.js";
 import { getUser } from "/game/js/store.js";
 import { currentUserId, loginHref } from "../js/quotaClient.js";
 
-const SLOT_COUNT = 3;
+const MAX_LINES = 3;
+const FLASH_MS = 2200;
 
 const UI = {
   en: {
-    title: "syncNote",
+    title: "Text Relay",
     sub: "Three relay fields across devices. Saved until you delete each one.",
     back: "Toolbox",
-    loginDesc: "Sign in to use syncNote.",
+    loginDesc: "Sign in to use Text Relay.",
     loginBtn: "Sign in / Register",
     slot: (n) => `Relay ${n}`,
     copy: "Copy",
@@ -27,10 +28,10 @@ const UI = {
     errClip: "Clipboard unavailable",
   },
   zh: {
-    title: "syncNote",
+    title: "文本中转站",
     sub: "三个中转框，跨设备同步；不点删除则一直保留各框内容。",
     back: "返回工具箱",
-    loginDesc: "请登录后使用 syncNote。",
+    loginDesc: "请登录后使用文本中转站。",
     loginBtn: "登录 / 注册",
     slot: (n) => `中转 ${n}`,
     copy: "复制",
@@ -48,10 +49,10 @@ const UI = {
     errClip: "无法访问剪贴板",
   },
   ja: {
-    title: "syncNote",
+    title: "テキスト中継",
     sub: "3つの中継欄で端末間同期。削除するまで各欄を保持。",
     back: "ツールボックス",
-    loginDesc: "syncNote を使うにはログインしてください。",
+    loginDesc: "テキスト中継を使うにはログインしてください。",
     loginBtn: "ログイン / 登録",
     slot: (n) => `中継 ${n}`,
     copy: "コピー",
@@ -74,6 +75,9 @@ let lang = getPortalLang();
 let t = UI[lang] || UI.en;
 const saveTimers = new Map();
 const dirtySlots = new Set();
+const baselineStatus = new Map();
+const flashTimers = new Map();
+const flashing = new Set();
 
 const errBox = document.getElementById("errBox");
 const loginPanel = document.getElementById("loginPanel");
@@ -88,8 +92,30 @@ function slotInput(el) {
   return el.querySelector(".sync-input");
 }
 
-function slotStatus(el) {
+function slotStatusEl(el) {
   return el.querySelector(".sync-status");
+}
+
+function lineMetrics(ta) {
+  const style = getComputedStyle(ta);
+  const lh = parseFloat(style.lineHeight) || 21;
+  const padY = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  return { lh, padY };
+}
+
+function fitInput(ta, { tail = false } = {}) {
+  const { lh, padY } = lineMetrics(ta);
+  ta.style.height = "0";
+  const contentLines = Math.max(1, Math.ceil((ta.scrollHeight - padY) / lh));
+  const visibleLines = Math.min(MAX_LINES, contentLines);
+  ta.style.height = `${visibleLines * lh + padY}px`;
+  if (tail || (contentLines > MAX_LINES && document.activeElement !== ta)) {
+    ta.scrollTop = ta.scrollHeight;
+  }
+}
+
+function fitAllInputs(opts) {
+  slotEls.forEach((el) => fitInput(slotInput(el), opts));
 }
 
 function applyI18n() {
@@ -108,8 +134,31 @@ function applyI18n() {
   });
 }
 
-function setSlotStatus(el, msg) {
-  slotStatus(el).textContent = msg || "";
+function renderBaseline(slot) {
+  if (flashing.has(slot)) return;
+  const el = slotEls.find((s) => slotNum(s) === slot);
+  if (!el) return;
+  slotStatusEl(el).textContent = baselineStatus.get(slot) || "";
+}
+
+function setBaseline(el, msg) {
+  const slot = slotNum(el);
+  baselineStatus.set(slot, msg);
+  renderBaseline(slot);
+}
+
+function flashStatus(el, msg) {
+  const slot = slotNum(el);
+  clearTimeout(flashTimers.get(slot));
+  flashing.add(slot);
+  slotStatusEl(el).textContent = msg;
+  flashTimers.set(
+    slot,
+    setTimeout(() => {
+      flashing.delete(slot);
+      renderBaseline(slot);
+    }, FLASH_MS)
+  );
 }
 
 function showError(msg) {
@@ -119,6 +168,14 @@ function showError(msg) {
 
 function apiBody(extra = {}) {
   return JSON.stringify({ user_id: currentUserId(), ...extra });
+}
+
+function loadedLabel(updatedAt) {
+  return updatedAt ? `${t.loaded} · ${updatedAt}` : t.loaded;
+}
+
+function savedLabel(updatedAt) {
+  return updatedAt ? `${t.saved} · ${updatedAt}` : t.saved;
 }
 
 async function loadNotes() {
@@ -133,9 +190,11 @@ async function loadNotes() {
     slotEls.forEach((el) => {
       const slot = slotNum(el);
       const row = bySlot.get(slot) || { content: "", updatedAt: null };
-      slotInput(el).value = row.content || "";
+      const ta = slotInput(el);
+      ta.value = row.content || "";
       dirtySlots.delete(slot);
-      setSlotStatus(el, row.updatedAt ? `${t.loaded} · ${row.updatedAt}` : t.loaded);
+      setBaseline(el, loadedLabel(row.updatedAt));
+      fitInput(ta, { tail: true });
     });
     const userLine = document.getElementById("userLine");
     userLine.hidden = false;
@@ -145,11 +204,11 @@ async function loadNotes() {
   }
 }
 
-async function saveSlot(el) {
+async function saveSlot(el, { quiet = false } = {}) {
   const uid = currentUserId();
   if (!uid) return;
   const slot = slotNum(el);
-  setSlotStatus(el, t.saving);
+  if (!quiet && !flashing.has(slot)) setBaseline(el, t.saving);
   try {
     const res = await fetch("/api/portal?action=syncnote_save", {
       method: "POST",
@@ -159,10 +218,10 @@ async function saveSlot(el) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t.errSave);
     dirtySlots.delete(slot);
-    setSlotStatus(el, data.updatedAt ? `${t.saved} · ${data.updatedAt}` : t.saved);
+    if (!flashing.has(slot)) setBaseline(el, savedLabel(data.updatedAt));
   } catch (e) {
     showError(e.message || t.errSave);
-    setSlotStatus(el, "");
+    if (!flashing.has(slot)) renderBaseline(slot);
   }
 }
 
@@ -170,7 +229,7 @@ function scheduleSave(el) {
   const slot = slotNum(el);
   dirtySlots.add(slot);
   clearTimeout(saveTimers.get(slot));
-  saveTimers.set(slot, setTimeout(() => saveSlot(el), 600));
+  saveTimers.set(slot, setTimeout(() => saveSlot(el, { quiet: flashing.has(slot) }), 600));
 }
 
 async function clearSlot(el) {
@@ -186,31 +245,40 @@ async function clearSlot(el) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || t.errSave);
-    slotInput(el).value = "";
+    const ta = slotInput(el);
+    ta.value = "";
     dirtySlots.delete(slot);
-    setSlotStatus(el, t.cleared);
+    fitInput(ta);
+    flashStatus(el, t.cleared);
+    setBaseline(el, "");
   } catch (e) {
     showError(e.message || t.errSave);
   }
 }
 
-async function copySlot(el) {
+async function copySlot(el, e) {
+  e.preventDefault();
+  e.stopPropagation();
   showError("");
   try {
     await navigator.clipboard.writeText(slotInput(el).value);
-    setSlotStatus(el, t.copied);
+    flashStatus(el, t.copied);
   } catch {
     showError(t.errClip);
   }
 }
 
-async function pasteSlot(el) {
+async function pasteSlot(el, e) {
+  e.preventDefault();
+  e.stopPropagation();
   showError("");
   try {
     const text = await navigator.clipboard.readText();
-    slotInput(el).value = text;
+    const ta = slotInput(el);
+    ta.value = text;
+    fitInput(ta, { tail: true });
+    flashStatus(el, t.pasted);
     scheduleSave(el);
-    setSlotStatus(el, t.pasted);
   } catch {
     showError(t.errClip);
   }
@@ -235,14 +303,30 @@ mountLangTabs(document.getElementById("langSlot"), {
     lang = next;
     t = UI[lang] || UI.en;
     applyI18n();
+    baselineStatus.forEach((msg, slot) => {
+      if (!flashing.has(slot)) {
+        const el = slotEls.find((s) => slotNum(s) === slot);
+        if (el) slotStatusEl(el).textContent = msg;
+      }
+    });
   },
 });
 
 slotEls.forEach((el) => {
-  slotInput(el).addEventListener("input", () => scheduleSave(el));
-  el.querySelector(".sync-copy").addEventListener("click", () => copySlot(el));
-  el.querySelector(".sync-paste").addEventListener("click", () => pasteSlot(el));
-  el.querySelector(".sync-clear").addEventListener("click", () => clearSlot(el));
+  const ta = slotInput(el);
+  ta.addEventListener("input", () => {
+    fitInput(ta);
+    scheduleSave(el);
+  });
+  ta.addEventListener("focus", () => fitInput(ta));
+  ta.addEventListener("blur", () => fitInput(ta, { tail: true }));
+  el.querySelector(".sync-copy").addEventListener("click", (e) => copySlot(el, e));
+  el.querySelector(".sync-paste").addEventListener("click", (e) => pasteSlot(el, e));
+  el.querySelector(".sync-clear").addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    clearSlot(el);
+  });
 });
 
 window.addEventListener("beforeunload", () => {

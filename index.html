@@ -1,216 +1,566 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>1024201 | 1042 Portal</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#007aff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="1042">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <title>1024201 | Portal</title>
     <style>
-        /* iOS 原生系统设计规范 */
         :root {
             --ios-bg: #f2f2f7;
             --ios-card: #ffffff;
             --ios-text: #000000;
             --ios-text-secondary: #8e8e93;
             --ios-blue: #007aff;
-            --ios-blur-bg: rgba(255, 255, 255, 0.7);
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Icons", "Helvetica Neue", Helvetica, Arial, sans-serif; }
-        
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif; }
+
         body { background-color: var(--ios-bg); color: var(--ios-text); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 20px; overflow-x: hidden; }
 
-        /* 顶部导航栏 (iOS 磨砂玻璃状态栏风格) */
-        header { width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; z-index: 10; }
+        header { width: 100%; max-width: 800px; display: flex; justify-content: space-between; align-items: flex-start; padding: 10px 0; z-index: 10; gap: 10px; }
 
-        /* 左上角：多国时区（iOS 世界时钟组件扁平化风格） */
-        .time-zones { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; background: var(--ios-card); padding: 12px; border-radius: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.04); }
-        .zone-item { font-size: 11px; color: var(--ios-text-secondary); font-weight: 500; display: flex; flex-direction: column; }
-        .zone-time { font-size: 14px; color: var(--ios-text); font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+        .sidebar-widgets {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 200px;
+            flex-shrink: 0;
+        }
 
-        /* 右上角：控制区 */
-        .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-        .ios-btn { background: var(--ios-card); border: none; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 500; color: var(--ios-blue); cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: all 0.2s; }
-        .ios-btn:active { transform: scale(0.95); background: #e5e5ea; }
-        select.ios-btn { appearance: none; padding-right: 24px; background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23007aff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: calc(100% - 8px) center; }
+        .widget-card {
+            background: var(--ios-card);
+            padding: 12px 14px;
+            border-radius: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+        }
 
-        /* 主体中心区 */
-        main { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-grow: 1; gap: 40px; margin: 40px 0; }
-        
-        /* 门户大标题（回文数 1042） */
-        .portal-title { font-size: 42px; font-weight: 700; tracking: -0.5px; color: #1c1c1e; }
+        .time-zones { width: 100%; }
 
-        /* 图标矩阵 */
-        .app-grid { display: flex; gap: 45px; justify-content: center; align-items: center; }
-        
-        /* iOS App 经典正方形黄金圆角 */
-        .app-item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: var(--ios-text); cursor: pointer; }
-        .app-icon { width: 90px; height: 90px; border-radius: 21.5%; box-shadow: 0 8px 24px rgba(0,0,0,0.08); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; justify-content: center; }
-        .app-item:hover .app-icon { transform: scale(1.06); }
-        .app-item:active .app-icon { transform: scale(0.94); }
-        
-        /* iOS 默认微渐变色彩搭配 */
+        .device-widget {
+            border: 1px solid rgba(0, 122, 255, 0.12);
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            box-shadow: 0 4px 14px rgba(0, 122, 255, 0.08);
+        }
+
+        .widget-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--ios-text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .device-location {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ios-text);
+            line-height: 1.35;
+            word-break: break-word;
+        }
+
+        .device-location.is-loading { color: var(--ios-text-secondary); font-weight: 500; }
+
+        .ip-line { font-size: 13px; font-weight: 600; line-height: 1.35; word-break: break-word; }
+        .ip-sub { font-size: 11px; color: var(--ios-text-secondary); margin-top: 4px; }
+        .ip-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+        .ip-tag {
+            font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+            background: #f2f2f7; color: #3a3a3c;
+        }
+        .ip-tag.proxy { background: #fff4e5; color: #c93400; }
+        .purity-pill {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 42px; padding: 3px 8px; border-radius: 6px;
+            font-size: 11px; font-weight: 700; color: #fff;
+        }
+        .purity-pill.high { background: #34c759; }
+        .purity-pill.mid { background: #ff9f0a; }
+        .purity-pill.low { background: #ff3b30; }
+
+        .zone-date {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e5ea;
+            color: var(--ios-blue);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .zone-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+        .zone-row {
+            display: grid;
+            grid-template-columns: 82px 1fr;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 6px;
+            border-radius: 8px;
+            cursor: pointer;
+            min-height: 28px;
+        }
+        .zone-row:hover { background: #f2f2f7; }
+        .zone-row.active { background: #eef6ff; }
+        .zone-label {
+            font-size: 12px;
+            color: var(--ios-text-secondary);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .zone-row.active .zone-label { color: var(--ios-text); font-weight: 600; }
+        .zone-time {
+            font-size: 13px;
+            color: var(--ios-text);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            text-align: right;
+            letter-spacing: -0.3px;
+        }
+        .zone-row.active .zone-time { color: var(--zone-accent, var(--ios-blue)); }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex-shrink: 0;
+            gap: 6px;
+        }
+
+        main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+            width: 100%;
+            max-width: 520px;
+            margin: 24px 0 40px;
+        }
+
+        .portal-hero {
+            position: relative;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 4px 0 8px;
+        }
+
+        .portal-stack {
+            position: relative;
+            width: fit-content;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        .portal-title-layer {
+            position: absolute;
+            left: 50%;
+            top: -32px;
+            transform: translateX(-50%);
+            width: 194%;
+            max-width: 756px;
+            z-index: 3;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+
+        .portal-title-glow {
+            position: absolute;
+            left: 50%;
+            top: 55%;
+            transform: translate(-50%, -50%);
+            width: 175%;
+            height: 320px;
+            background: radial-gradient(
+                ellipse 72% 68% at 50% 44%,
+                rgba(0, 122, 255, 0.34) 0%,
+                rgba(84, 203, 255, 0.16) 32%,
+                rgba(0, 122, 255, 0.06) 55%,
+                transparent 72%
+            );
+            filter: blur(14px);
+            z-index: 0;
+        }
+
+        .portal-title-svg {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 756px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+            overflow: visible;
+            filter: blur(1.6px);
+        }
+
+        .portal-title-text {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+            font-size: 165px;
+            font-weight: 700;
+            letter-spacing: -11px;
+            fill: #007aff;
+            fill-opacity: 0.28;
+        }
+
+        .app-grid {
+            position: relative;
+            z-index: 2;
+            display: grid;
+            grid-template-columns: repeat(2, auto);
+            gap: 18px 26px;
+            justify-content: center;
+            align-items: center;
+            width: fit-content;
+            margin: 0 auto;
+            padding: 0;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        .app-item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: var(--ios-text); }
+        .app-icon { width: 90px; height: 90px; border-radius: 21.5%; box-shadow: 0 8px 24px rgba(0,0,0,0.08); display: flex; align-items: center; justify-content: center; }
         .icon-mail { background: linear-gradient(135deg, #54cbff 0%, #007aff 100%); }
-        .icon-game { background: linear-gradient(135deg, #ff5e62 0%, #ff9966 100%); }
-        
+        .icon-game { background: linear-gradient(135deg, #ff6b6b 0%, #ff9f43 100%); }
+        .icon-fx { background: linear-gradient(135deg, #5ac8fa 0%, #34c759 100%); }
+        .icon-tools { background: linear-gradient(135deg, #8e8e93 0%, #636366 100%); }
         .app-icon svg { width: 44px; height: 44px; fill: white; }
-        .app-label { margin-top: 10px; font-size: 14px; font-weight: 500; letter-spacing: -0.2px; }
+        .icon-tools svg { width: 38px; height: 38px; }
+        .app-label { margin-top: 10px; font-size: 14px; font-weight: 500; }
 
-        /* 页脚版权 */
         footer { font-size: 12px; color: var(--ios-text-secondary); padding: 10px 0; }
 
-        /* iOS 原生弹窗 (Modal) 样式 */
-        .ios-modal-mask { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
-        .ios-modal-mask.active { opacity: 1; pointer-events: auto; }
-        .ios-modal { background: var(--ios-blur-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); width: 280px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: flex; flex-direction: column; transform: scale(1.1); transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
-        .ios-modal-mask.active .ios-modal { transform: scale(1); }
-        .modal-body { padding: 20px; text-align: center; }
-        .modal-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
-        .modal-text { font-size: 13px; color: #000; line-height: 1.4; }
-        .modal-action { border-top: 0.5px solid rgba(0,0,0,0.15); color: var(--ios-blue); font-size: 17px; font-weight: 600; padding: 12px 0; text-align: center; cursor: pointer; }
-        .modal-action:active { background: rgba(0,0,0,0.05); border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
-
-        /* 门户右上角登录 icon：与 .ios-btn 同高，排在「关于」之后 */
-        #userBarSlot { display: flex; align-items: center; }
+        #userBarSlot { display: flex; align-items: center; justify-content: center; }
         #userBarSlot .user-bar { align-items: center; }
-        #userBarSlot .user-bar-guest {
-            padding: 8px 14px;
-            min-height: 0;
-            line-height: 1;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+
+        @media (max-width: 768px) {
+            body {
+                padding: max(36px, calc(env(safe-area-inset-top) + 24px)) 14px 20px;
+            }
+
+            header {
+                display: grid;
+                grid-template-columns: auto auto;
+                justify-content: space-between;
+                align-items: stretch;
+                gap: 10px;
+                padding-top: 10px;
+                margin-top: 4px;
+            }
+
+            .sidebar-widgets {
+                width: 200px;
+                max-width: 200px;
+                flex-shrink: 0;
+            }
+
+            .controls {
+                align-self: flex-start;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-start;
+                align-items: center;
+                gap: 6px;
+                padding-top: 0;
+            }
+
+            #userBarSlot {
+                flex-shrink: 0;
+            }
+
+            main {
+                max-width: 100%;
+                margin: 16px 0 32px;
+            }
+
+            .app-grid {
+                gap: 16px 22px;
+                padding: 0;
+            }
+
+            .app-icon {
+                width: 74px;
+                height: 74px;
+                border-radius: 21.5%;
+                box-shadow: 0 6px 18px rgba(0,0,0,0.07);
+            }
+
+            .app-icon svg {
+                width: 36px;
+                height: 36px;
+            }
+
+            .icon-tools svg {
+                width: 32px;
+                height: 32px;
+            }
+
+            .app-label {
+                margin-top: 8px;
+                font-size: 13px;
+            }
         }
-        #userBarSlot .user-bar-guest svg { width: 14px; height: 14px; }
     </style>
-    <link rel="stylesheet" href="/game/css/userBar.css?v=4">
+    <link rel="stylesheet" href="/js/langTabs.css">
+    <link rel="stylesheet" href="/game/css/userBar.css?v=6">
 </head>
 <body>
 
     <header>
-        <div class="time-zones">
-            <div class="zone-item"><span id="lbl-bj">北京</span><span class="zone-time" id="tz-bj">--:--</span></div>
-            <div class="zone-item"><span id="lbl-sk">圣何塞</span><span class="zone-time" id="tz-sk">--:--</span></div>
-            <div class="zone-item"><span id="lbl-db">大阪</span><span class="zone-time" id="tz-db">--:--</span></div>
-            <div class="zone-item"><span id="lbl-jdm">加德满都</span><span class="zone-time" id="tz-jdm">--:--</span></div>
+        <div class="sidebar-widgets">
+            <div class="widget-card time-zones">
+                <div class="zone-date" id="zoneDate">--</div>
+                <ul class="zone-list">
+                    <li class="zone-row" data-zone="us" data-tz="America/Los_Angeles" data-color="#5856d6">
+                        <span class="zone-label" id="lbl-us">San Jose</span>
+                        <span class="zone-time" id="tz-us">--:--</span>
+                    </li>
+                    <li class="zone-row" data-zone="jp" data-tz="Asia/Tokyo" data-color="#ff9500">
+                        <span class="zone-label" id="lbl-jp">Osaka</span>
+                        <span class="zone-time" id="tz-jp">--:--</span>
+                    </li>
+                    <li class="zone-row" data-zone="cn" data-tz="Asia/Shanghai" data-color="#007aff">
+                        <span class="zone-label" id="lbl-cn">Beijing</span>
+                        <span class="zone-time" id="tz-cn">--:--</span>
+                    </li>
+                    <li class="zone-row" data-zone="se" data-tz="Europe/Stockholm" data-color="#34c759">
+                        <span class="zone-label" id="lbl-se">Gothenburg</span>
+                        <span class="zone-time" id="tz-se">--:--</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="widget-card device-widget">
+                <div class="widget-label" id="locTitle">IP Location</div>
+                <div id="ipWidget">
+                    <div class="ip-line is-loading" id="deviceLocation">Locating…</div>
+                    <div class="ip-tags" id="ipTags" hidden></div>
+                </div>
+            </div>
         </div>
 
         <div class="controls">
-            <select class="ios-btn" id="langSelect" onchange="changeLang(this.value)">
-                <option value="zh">简体中文</option>
-                <option value="en">English</option>
-                <option value="ja">日本語</option>
-                <option value="bo">བོད་སྐད།</option>
-            </select>
-            <button class="ios-btn" id="btn-about" onclick="toggleModal(true)">关于</button>
             <div id="userBarSlot"></div>
+            <div id="langSlot"></div>
         </div>
     </header>
 
     <main>
-        <div class="portal-title">1042</div>
-        
-        <div class="app-grid">
-            <a href="https://mail.1024201.com" class="app-item">
-                <div class="app-icon icon-mail">
-                    <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+        <div class="portal-hero">
+            <div class="portal-stack">
+                <div class="portal-title-layer" aria-hidden="true">
+                    <div class="portal-title-glow"></div>
+                    <svg class="portal-title-svg" viewBox="0 0 560 120" preserveAspectRatio="xMidYMid meet" role="img" aria-label="1024201">
+                        <text x="280" y="92" text-anchor="middle" class="portal-title-text">1024201</text>
+                    </svg>
                 </div>
-                <div class="app-label" id="app-mail">邮箱</div>
-            </a>
-
-            <a href="/game/" class="app-item">
-                <div class="app-icon icon-game">
-                    <svg viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm4-3c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                <div class="app-grid">
+                <a href="https://mail.1024201.com" class="app-item">
+                    <div class="app-icon icon-mail">
+                        <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                    </div>
+                    <div class="app-label" id="app-mail">Mail</div>
+                </a>
+                <a href="/game/" class="app-item">
+                    <div class="app-icon icon-game">
+                        <svg viewBox="0 0 24 24"><path d="M15.5 6c-1.1 0-2 .9-2 2v2H10.5V8c0-1.1-.9-2-2-2s-2 .9-2 2v2H5c-1.1 0-2 .9-2 2v5c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-5c0-1.1-.9-2-2-2h-1.5V8c0-1.1-.9-2-2-2zm-6 9.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm5 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+                    </div>
+                    <div class="app-label" id="app-game">Game Center</div>
+                </a>
+                <a href="/fx/" class="app-item">
+                    <div class="app-icon icon-fx">
+                        <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 9.5a7 4.5 0 0 1 11.8-1.2" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M17.5 7.5 19.5 9 18 10.8" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 14.5a7 4.5 0 0 1-11.8 1.2" stroke="#fff" stroke-width="2" stroke-linecap="round"/><path d="M6.5 16.5 4.5 15 6 13.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </div>
+                    <div class="app-label" id="app-fx">Rates</div>
+                </a>
+                <a href="/tools/" class="app-item">
+                    <div class="app-icon icon-tools">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>
+                    </div>
+                    <div class="app-label" id="app-tools">Toolbox</div>
+                </a>
                 </div>
-                <div class="app-label" id="app-game">小游戏</div>
-            </a>
+            </div>
         </div>
     </main>
 
-    <footer>
-        &copy; 2026 1024201.com
-    </footer>
-
-    <div class="ios-modal-mask" id="aboutModal" onclick="toggleModal(false)">
-        <div class="ios-modal" onclick="event.stopPropagation()">
-            <div class="modal-body">
-                <div class="modal-title" id="mdl-title">关于 1042</div>
-                <div class="modal-text" id="mdl-text">2026年6月，回文开始了。。。</div>
-            </div>
-            <div class="modal-action" onclick="toggleModal(false)" id="mdl-close">好</div>
-        </div>
-    </div>
+    <footer>&copy; 2026 1024201.com</footer>
 
     <script>
-        // 多语言字典配置
+        const ZONE_MIGRATE = { bj: 'cn', sk: 'us', db: 'jp', jdm: 'se' };
+
         const i18n = {
-            zh: {
-                bj: "北京", sk: "圣何塞", db: "大阪", jdm: "加德满都",
-                about: "关于", mail: "邮箱", game: "小游戏",
-                userHint: "点击退出", logout: "退出登录",
-                mTitle: "关于 1042", mText: "2026年6月，回文开始了。。。", mClose: "好"
-            },
             en: {
-                bj: "Beijing", sk: "San Jose", db: "Osaka", jdm: "Kathmandu",
-                about: "About", mail: "Mail", game: "Games",
-                userHint: "Tap to sign out", logout: "Sign out",
-                mTitle: "About 1042", mText: "June 2026, the palindrome begins...", mClose: "OK"
+                us: 'San Jose', jp: 'Osaka', cn: 'Beijing', se: 'Gothenburg',
+                mail: 'Mail', game: 'Game Center', fx: 'Rates', tools: 'Toolbox',
+                locTitle: 'IP Location', locating: 'Locating…', locUnavailable: 'Location unavailable',
+                netResidential: 'Home broadband', netDatacenter: 'Datacenter', netMobile: 'Mobile network',
+                purity: 'Purity', proxy: 'Proxy/VPN'
             },
             ja: {
-                bj: "北京", sk: "サンノゼ", db: "大阪", jdm: "カトマンズ",
-                about: "情報", mail: "メール", game: "一文執筆",
-                userHint: "タップでログアウト", logout: "ログアウト",
-                mTitle: "1042 について", mText: "2026年6月、回文が始まった...", mClose: "了解"
+                us: 'サンノゼ', jp: '大阪', cn: '北京', se: 'ヨーテボリ',
+                mail: 'メール', game: 'ゲームセンター', fx: '為替', tools: 'ツールボックス',
+                locTitle: 'IP位置', locating: '取得中…', locUnavailable: '位置を取得できません',
+                netResidential: '家庭用回線', netDatacenter: 'データセンター', netMobile: 'モバイル回線',
+                purity: '純度', proxy: 'プロキシ/VPN'
             },
-            bo: {
-                bj: "པེ་ཅིང།", sk: "སན་ཧོ་སེ།", db: "ཨོ་སཱ་ཀཱ།", jdm: "ཀཐ་མན་གྲུ།",
-                about: "སྐོར།", mail: "ཡིག་ཟམ།", game: "ཚིག་གཅིག་དེབ་འབྲི།",
-                userHint: "སྤྱོད་མཁན་མིང་ལ་བརྡབས་ནས་ཕྱིར་འཐེན།", logout: "ཕྱིར་འཐེན།",
-                mTitle: "1042 སྐོར།", mText: "༢༠༢༦ ལོའི་ཟླ་ ༦ པར། ལྡོག་ཚིག་འགོ་བཙུགས་སོ།།", mClose: "ཡིན།"
+            zh: {
+                us: '圣何塞', jp: '大阪', cn: '北京', se: '哥德堡',
+                mail: '邮箱', game: '游戏中心', fx: '汇率', tools: '工具箱',
+                locTitle: 'IP 位置', locating: '定位中…', locUnavailable: '无法获取位置',
+                netResidential: '家庭宽带', netDatacenter: '机房网络', netMobile: '移动网络',
+                purity: '纯净度', proxy: '代理/VPN'
             }
         };
 
-        // 切换语言逻辑
-        function changeLang(lang) {
-            document.getElementById('lbl-bj').innerText = i18n[lang].bj;
-            document.getElementById('lbl-sk').innerText = i18n[lang].sk;
-            document.getElementById('lbl-db').innerText = i18n[lang].db;
-            document.getElementById('lbl-jdm').innerText = i18n[lang].jdm;
-            document.getElementById('btn-about').innerText = i18n[lang].about;
-            document.getElementById('app-mail').innerText = i18n[lang].mail;
-            document.getElementById('app-game').innerText = i18n[lang].game;
-            document.getElementById('mdl-title').innerText = i18n[lang].mTitle;
-            document.getElementById('mdl-text').innerText = i18n[lang].mText;
-            document.getElementById('mdl-close').innerText = i18n[lang].mClose;
-            
-            localStorage.setItem('portal_lang', lang);
-            import('/game/js/userBar.js?v=4').then(({ mountUserBar }) => {
-                mountUserBar(document.getElementById('userBarSlot'), { variant: 'ios', returnPath: '' });
+        function setLangActive(lang) {
+            document.querySelectorAll('#langSlot .lang-tab').forEach((btn) => {
+                btn.classList.toggle('active', btn.dataset.lang === lang);
             });
         }
 
-        // 弹窗控制
-        function toggleModal(show) {
-            const modal = document.getElementById('aboutModal');
-            if(show) modal.classList.add('active');
-            else modal.classList.remove('active');
+        function applyI18n(lang) {
+            if (!i18n[lang]) lang = 'en';
+            const t = i18n[lang];
+            document.documentElement.lang = lang === 'zh' ? 'zh-CN' : lang === 'ja' ? 'ja-JP' : 'en';
+            document.getElementById('lbl-us').innerText = t.us;
+            document.getElementById('lbl-jp').innerText = t.jp;
+            document.getElementById('lbl-cn').innerText = t.cn;
+            document.getElementById('lbl-se').innerText = t.se;
+            document.getElementById('app-mail').innerText = t.mail;
+            document.getElementById('app-game').innerText = t.game;
+            document.getElementById('app-fx').innerText = t.fx;
+            document.getElementById('app-tools').innerText = t.tools;
+            document.getElementById('locTitle').innerText = t.locTitle;
+            const locEl = document.getElementById('deviceLocation');
+            if (locEl.classList.contains('is-loading')) {
+                locEl.innerText = t.locating;
+            }
         }
 
-        // 世界时钟高精引擎
+        function netLabel(data, t) {
+            if (data.networkType === 'datacenter' || data.hosting) return t.netDatacenter;
+            if (data.mobile) return t.netMobile;
+            return t.netResidential;
+        }
+
+        function renderIpWidget(data, t) {
+            const locEl = document.getElementById('deviceLocation');
+            const tagsEl = document.getElementById('ipTags');
+            locEl.classList.remove('is-loading');
+            locEl.innerHTML = `${data.label || t.locUnavailable}<div class="ip-sub">${data.ip || ''}</div>`;
+            const purityCls = data.purityLevel === 'high' ? 'high' : data.purityLevel === 'mid' ? 'mid' : 'low';
+            let tags = `<span class="ip-tag">${netLabel(data, t)}</span>`;
+            tags += `<span class="purity-pill ${purityCls}">${t.purity} ${data.purity}%</span>`;
+            if (data.proxy) tags += `<span class="ip-tag proxy">${t.proxy}</span>`;
+            if (data.asn) tags += `<span class="ip-tag">AS${data.asn}</span>`;
+            tagsEl.innerHTML = tags;
+            tagsEl.hidden = false;
+        }
+
+        function changeLang(lang) {
+            if (!i18n[lang]) lang = 'en';
+            applyI18n(lang);
+            localStorage.setItem('portal_lang', lang);
+            setLangActive(lang);
+            import('/game/js/userBar.js?v=6').then(({ mountUserBar }) => {
+                mountUserBar(document.getElementById('userBarSlot'), { variant: 'ios', returnPath: '' });
+            });
+            updateClocks();
+            fetch('/api/portal?action=geo').then((r) => r.json()).then((data) => {
+                renderIpWidget(data, i18n[lang] || i18n.en);
+            }).catch(() => loadDeviceLocation());
+        }
+
+        const DATE_LOCALE = { zh: 'zh-CN', en: 'en-US', ja: 'ja-JP' };
+        let storedZone = localStorage.getItem('portal_date_zone') || 'us';
+        let activeDateZone = ZONE_MIGRATE[storedZone] || storedZone;
+        if (!['us', 'jp', 'cn', 'se'].includes(activeDateZone)) activeDateZone = 'us';
+
+        function setActiveDateZone(zoneId) {
+            activeDateZone = zoneId;
+            localStorage.setItem('portal_date_zone', zoneId);
+            document.querySelectorAll('.zone-row').forEach((row) => {
+                const on = row.dataset.zone === zoneId;
+                row.classList.toggle('active', on);
+                if (on) row.style.setProperty('--zone-accent', row.dataset.color);
+            });
+            updateClocks();
+        }
+
+        document.querySelectorAll('.zone-row').forEach((row) => {
+            row.addEventListener('click', () => setActiveDateZone(row.dataset.zone));
+        });
+
         function updateClocks() {
             const now = new Date();
-            const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            const lang = localStorage.getItem('portal_lang') || 'en';
+            const timeOpts = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+            const dateOpts = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
 
-            document.getElementById('tz-bj').innerText = now.toLocaleTimeString('zh-CN', { ...options, timeZone: 'Asia/Shanghai' });
-            document.getElementById('tz-db').innerText = now.toLocaleTimeString('zh-CN', { ...options, timeZone: 'Asia/Tokyo' });
-            document.getElementById('tz-sk').innerText = now.toLocaleTimeString('zh-CN', { ...options, timeZone: 'America/Los_Angeles' });
-            document.getElementById('tz-jdm').innerText = now.toLocaleTimeString('zh-CN', { ...options, timeZone: 'Asia/Kathmandu' });
+            document.querySelectorAll('.zone-row').forEach((row) => {
+                document.getElementById(`tz-${row.dataset.zone}`).innerText = now.toLocaleTimeString('en-GB', { ...timeOpts, timeZone: row.dataset.tz });
+            });
+
+            const activeRow = document.querySelector(`.zone-row[data-zone="${activeDateZone}"]`) || document.querySelector('.zone-row');
+            if (!activeRow) return;
+            document.getElementById('zoneDate').style.color = activeRow.dataset.color;
+            document.getElementById('zoneDate').innerText = now.toLocaleDateString(DATE_LOCALE[lang] || 'en-US', { ...dateOpts, timeZone: activeRow.dataset.tz });
         }
 
-        // 初始化加载
-        const savedLang = localStorage.getItem('portal_lang') || 'zh';
-        document.getElementById('langSelect').value = savedLang;
-        changeLang(savedLang);
+        async function loadDeviceLocation() {
+            const locEl = document.getElementById('deviceLocation');
+            const tagsEl = document.getElementById('ipTags');
+            const lang = localStorage.getItem('portal_lang') || 'en';
+            const t = i18n[lang] || i18n.en;
+            locEl.classList.add('is-loading');
+            locEl.innerText = t.locating;
+            tagsEl.hidden = true;
+            try {
+                const res = await fetch('/api/portal?action=geo');
+                const data = await res.json();
+                renderIpWidget(data, t);
+            } catch (_) {
+                locEl.classList.remove('is-loading');
+                locEl.innerText = t.locUnavailable;
+                tagsEl.hidden = true;
+            }
+        }
 
-        updateClocks();
+        let savedLang = localStorage.getItem('portal_lang') || 'en';
+        if (!i18n[savedLang]) savedLang = 'en';
+        setActiveDateZone(activeDateZone);
+        import('/js/langTabs.js').then(({ mountLangTabs }) => {
+            mountLangTabs(document.getElementById('langSlot'), { onChange: changeLang });
+            changeLang(savedLang);
+        });
         setInterval(updateClocks, 1000);
+
+        window.addEventListener('pageshow', () => {
+            import('/game/js/userBar.js?v=6').then(({ mountUserBar }) => {
+                mountUserBar(document.getElementById('userBarSlot'), { variant: 'ios', returnPath: '' });
+            });
+            loadDeviceLocation();
+        });
     </script>
+    <script src="/pwa.js" defer></script>
 </body>
 </html>

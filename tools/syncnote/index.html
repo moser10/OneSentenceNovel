@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#30d158">
-  <title>syncNote | 1024201</title>
+  <title>Text Relay | 1024201</title>
   <link rel="stylesheet" href="/js/langTabs.css">
   <link rel="stylesheet" href="/js/featurePage.css">
   <link rel="stylesheet" href="syncnote.css">
@@ -17,7 +17,7 @@
     </div>
     <div class="feature-card sync-card">
       <div class="feature-card-head">
-        <h1 id="pageTitle">syncNote</h1>
+        <h1 id="pageTitle">Text Relay</h1>
         <p class="sub" id="pageSub"></p>
         <p class="sync-user" id="userLine" hidden></p>
       </div>
@@ -27,38 +27,40 @@
         <a class="btn-primary btn-link" id="loginBtn" href="/game/register/">Sign in</a>
       </div>
 
-      <div id="editorWrap" hidden>
-        <div class="sync-slots" id="slotsWrap">
-          <section class="sync-slot" data-slot="0">
-            <h2 class="sync-slot-label" data-slot-label="0"></h2>
-            <textarea class="sync-input" spellcheck="false" autocomplete="off"></textarea>
-            <p class="sync-status"></p>
-            <div class="sync-actions">
-              <button type="button" class="btn-primary sync-copy"></button>
-              <button type="button" class="btn-secondary sync-paste"></button>
-              <button type="button" class="btn-danger sync-clear"></button>
-            </div>
-          </section>
-          <section class="sync-slot" data-slot="1">
-            <h2 class="sync-slot-label" data-slot-label="1"></h2>
-            <textarea class="sync-input" spellcheck="false" autocomplete="off"></textarea>
-            <p class="sync-status"></p>
-            <div class="sync-actions">
-              <button type="button" class="btn-primary sync-copy"></button>
-              <button type="button" class="btn-secondary sync-paste"></button>
-              <button type="button" class="btn-danger sync-clear"></button>
-            </div>
-          </section>
-          <section class="sync-slot" data-slot="2">
-            <h2 class="sync-slot-label" data-slot-label="2"></h2>
-            <textarea class="sync-input" spellcheck="false" autocomplete="off"></textarea>
-            <p class="sync-status"></p>
-            <div class="sync-actions">
-              <button type="button" class="btn-primary sync-copy"></button>
-              <button type="button" class="btn-secondary sync-paste"></button>
-              <button type="button" class="btn-danger sync-clear"></button>
-            </div>
-          </section>
+      <div id="editorWrap" class="sync-editor" hidden>
+        <div class="sync-panel">
+          <div class="sync-slots" id="slotsWrap">
+            <section class="sync-slot" data-slot="0">
+              <h2 class="sync-slot-label" data-slot-label="0"></h2>
+              <textarea class="sync-input" rows="1" spellcheck="false" autocomplete="off"></textarea>
+              <p class="sync-status"></p>
+              <div class="sync-actions">
+                <button type="button" class="btn-primary sync-copy"></button>
+                <button type="button" class="btn-secondary sync-paste"></button>
+                <button type="button" class="btn-danger sync-clear"></button>
+              </div>
+            </section>
+            <section class="sync-slot" data-slot="1">
+              <h2 class="sync-slot-label" data-slot-label="1"></h2>
+              <textarea class="sync-input" rows="1" spellcheck="false" autocomplete="off"></textarea>
+              <p class="sync-status"></p>
+              <div class="sync-actions">
+                <button type="button" class="btn-primary sync-copy"></button>
+                <button type="button" class="btn-secondary sync-paste"></button>
+                <button type="button" class="btn-danger sync-clear"></button>
+              </div>
+            </section>
+            <section class="sync-slot" data-slot="2">
+              <h2 class="sync-slot-label" data-slot-label="2"></h2>
+              <textarea class="sync-input" rows="1" spellcheck="false" autocomplete="off"></textarea>
+              <p class="sync-status"></p>
+              <div class="sync-actions">
+                <button type="button" class="btn-primary sync-copy"></button>
+                <button type="button" class="btn-secondary sync-paste"></button>
+                <button type="button" class="btn-danger sync-clear"></button>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
       <p class="err" id="errBox" hidden></p>
