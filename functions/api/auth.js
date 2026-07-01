@@ -1,5 +1,5 @@
 import { corsHeaders, json, requireDb, generateUniqueName, ensureAppSchema } from "./_shared.js";
-import { hashPassword, verifyPassword, randomPassword } from "./_crypto.js";
+import { hashPassword, verifyPassword, randomPassword, randomVerifyCode } from "./_crypto.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -11,20 +11,61 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;");
 }
 
-function welcomeEmailHtml(name, verifyUrl, today) {
+function codeCaseLabel(code) {
+  const hasUpper = /[A-Z]/.test(code);
+  const hasLower = /[a-z]/.test(code);
+  if (hasUpper && hasLower) {
+    return { zh: "（其中包含大小写）", en: "(case-sensitive)" };
+  }
+  return { zh: "（其中不包含大小写）", en: "(not case-sensitive)" };
+}
+
+function welcomeEmailHtml(name, verifyCode, today) {
   const safeName = escapeHtml(name);
+  const safeCode = escapeHtml(verifyCode);
+  const caseNote = codeCaseLabel(verifyCode);
   return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.8;color:#1c1c1e;">
-<p style="margin:0 0 12px;">欢迎 ${safeName}：</p>
-<p style="margin:0 0 8px;padding-left:2em;"><a href="${verifyUrl}">点击此处验证邮箱</a></p>
-<p style="margin:0 0 16px;padding-left:2em;">祝玩儿的开心。</p>
-<p style="margin:0;">1024201 游戏中心</p>
+<p style="margin:0 0 12px;">欢迎 ${safeName}，</p>
+<p style="margin:0 0 12px;">Welcome ${safeName},</p>
+<p style="margin:0 0 8px;padding-left:1em;">注册码：<strong style="font-size:18px;letter-spacing:2px;">${safeCode}</strong>${caseNote.zh}</p>
+<p style="margin:0 0 8px;padding-left:1em;">Registration code: <strong style="font-size:18px;letter-spacing:2px;">${safeCode}</strong> ${caseNote.en}</p>
+<p style="margin:0 0 8px;padding-left:1em;">请在注册页面输入此验证码完成注册。</p>
+<p style="margin:0 0 16px;padding-left:1em;">Enter this code on the registration page to complete sign-up.</p>
+<p style="margin:0;"><strong>1024201</strong></p>
 <p style="margin:0;">${today}</p>
 </div>`;
 }
 
+async function completePendingRegistration(db, pending) {
+  if (await db.prepare("SELECT id FROM users WHERE email = ?").bind(pending.email).first()) {
+    await db.prepare("DELETE FROM pending_registrations WHERE id = ?").bind(pending.id).run();
+    return { ok: true, user: null, already: true };
+  }
+  if (await db.prepare("SELECT id FROM users WHERE username = ?").bind(pending.username).first()) {
+    await db.prepare("DELETE FROM pending_registrations WHERE id = ?").bind(pending.id).run();
+    return { ok: false, error: "昵称已被他人占用，请重新注册并更换昵称" };
+  }
+  const result = await db
+    .prepare(
+      `INSERT INTO users (email, username, password_hash, email_verified)
+       VALUES (?, ?, ?, 1)`
+    )
+    .bind(pending.email, pending.username, pending.password_hash)
+    .run();
+  await db.prepare("DELETE FROM pending_registrations WHERE id = ?").bind(pending.id).run();
+  const user = await db
+    .prepare(
+      `SELECT id, email, username, must_change_password, email_verified
+       FROM users WHERE id = ?`
+    )
+    .bind(result.meta.last_row_id)
+    .first();
+  return { ok: true, user };
+}
+
 async function sendMail(env, to, subject, html) {
   if (!env.RESEND_API_KEY) {
-    throw new Error("邮件服务未配置（RESEND_API_KEY）。请在 Cloudflare → Workers → one-sentence-novel → Settings → Variables 添加 Secret。");
+    throw new Error("邮件服务未配置（RESEND_API_KEY）。请在 Cloudflare → Workers → 1024201-portal → Settings → Variables 添加 Secret。");
   }
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
@@ -32,7 +73,7 @@ async function sendMail(env, to, subject, html) {
       Authorization: `Bearer ${env.RESEND_API_KEY}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ from: "game@1024201.com", to, subject, html }),
+    body: JSON.stringify({ from: "admin@1024201.com", to, subject, html }),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
@@ -57,7 +98,7 @@ function isValidEmail(email) {
 function siteOrigin(request) {
   const url = new URL(request.url);
   if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return url.origin;
-  return "https://www.1024201.com";
+  return "https://1024201.com";
 }
 
 async function findUserByEmail(db, email) {
@@ -72,19 +113,11 @@ async function findUserByEmail(db, email) {
 }
 
 async function emailTaken(db, email) {
-  if (await db.prepare("SELECT id FROM users WHERE email = ?").bind(email).first()) return true;
-  return !!(await db
-    .prepare("SELECT id FROM pending_registrations WHERE email = ? AND expires_at > datetime('now')")
-    .bind(email)
-    .first());
+  return !!(await db.prepare("SELECT id FROM users WHERE email = ?").bind(email).first());
 }
 
 async function usernameTaken(db, username) {
-  if (await db.prepare("SELECT id FROM users WHERE username = ?").bind(username).first()) return true;
-  return !!(await db
-    .prepare("SELECT id FROM pending_registrations WHERE username = ? AND expires_at > datetime('now')")
-    .bind(username)
-    .first());
+  return !!(await db.prepare("SELECT id FROM users WHERE username = ?").bind(username).first());
 }
 
 async function verifyUserPassword(user, password) {
@@ -109,42 +142,48 @@ export async function onRequest(context) {
     await ensureAppSchema(db);
 
     if (request.method === "GET" && action === "verify") {
-      const token = url.searchParams.get("token")?.trim();
-      if (!token) {
-        return Response.redirect(`${siteOrigin(request)}/game/register/?verify=invalid`, 302);
-      }
+      return Response.redirect(`${siteOrigin(request)}/game/register/?verify=deprecated`, 302);
+    }
+
+    if (request.method === "POST" && action === "verify_code") {
+      const { email, code } = await request.json();
+      const mail = email?.trim();
+      const inputCode = code?.trim();
+      if (!mail || !inputCode) return json({ error: "邮箱和验证码不能为空" }, 400);
 
       const pending = await db
         .prepare(
           `SELECT * FROM pending_registrations
-           WHERE verify_token = ? AND expires_at > datetime('now')`
+           WHERE email = ? AND expires_at > datetime('now')`
         )
-        .bind(token)
+        .bind(mail)
         .first();
 
-      if (!pending) {
-        return Response.redirect(`${siteOrigin(request)}/game/register/?verify=invalid`, 302);
+      if (!pending) return json({ error: "验证码已过期，请重新发送注册邮件" }, 400);
+
+      if ((pending.verify_attempts || 0) >= 5) {
+        return json({ error: "验证码错误次数过多，请重新发送注册邮件", locked: true }, 403);
       }
 
-      if (await db.prepare("SELECT id FROM users WHERE email = ?").bind(pending.email).first()) {
-        await db.prepare("DELETE FROM pending_registrations WHERE id = ?").bind(pending.id).run();
-        return Response.redirect(`${siteOrigin(request)}/game/register/?verify=ok`, 302);
-      }
-      if (await db.prepare("SELECT id FROM users WHERE username = ?").bind(pending.username).first()) {
-        await db.prepare("DELETE FROM pending_registrations WHERE id = ?").bind(pending.id).run();
-        return Response.redirect(`${siteOrigin(request)}/game/register/?verify=conflict`, 302);
+      if (pending.verify_token !== inputCode) {
+        const attempts = (pending.verify_attempts || 0) + 1;
+        await db
+          .prepare("UPDATE pending_registrations SET verify_attempts = ? WHERE id = ?")
+          .bind(attempts, pending.id)
+          .run();
+        if (attempts >= 5) {
+          return json({ error: "验证码错误次数过多，请重新发送注册邮件", locked: true }, 403);
+        }
+        return json({ error: "验证码错误", attempts_left: 5 - attempts, verify_attempts: attempts }, 400);
       }
 
-      await db
-        .prepare(
-          `INSERT INTO users (email, username, password_hash, email_verified)
-           VALUES (?, ?, ?, 1)`
-        )
-        .bind(pending.email, pending.username, pending.password_hash)
-        .run();
-      await db.prepare("DELETE FROM pending_registrations WHERE id = ?").bind(pending.id).run();
-
-      return Response.redirect(`${siteOrigin(request)}/game/register/?verify=ok`, 302);
+      const done = await completePendingRegistration(db, pending);
+      if (!done.ok) return json({ error: done.error }, 409);
+      if (done.already) {
+        const user = await findUserByEmail(db, mail);
+        return json({ success: true, user: publicUser(user) });
+      }
+      return json({ success: true, user: publicUser(done.user) });
     }
 
     if (request.method === "POST" && action === "check") {
@@ -183,47 +222,38 @@ export async function onRequest(context) {
       if (await db.prepare("SELECT id FROM users WHERE username = ?").bind(name).first()) {
         return json({ error: "该昵称已被占用" }, 400);
       }
-      const pendingName = await db
-        .prepare(
-          `SELECT email FROM pending_registrations
-           WHERE username = ? AND expires_at > datetime('now') AND email != ?`
-        )
-        .bind(name, mail)
-        .first();
-      if (pendingName) {
-        return json({ error: "该昵称已被占用" }, 400);
-      }
 
       const passHash = await hashPassword(pass);
-      const verifyToken = crypto.randomUUID();
+      const verifyCode = randomVerifyCode(4);
 
       await db.prepare("DELETE FROM pending_registrations WHERE email = ?").bind(mail).run();
       await db
         .prepare(
-          `INSERT INTO pending_registrations (email, username, password_hash, verify_token, expires_at)
-           VALUES (?, ?, ?, ?, datetime('now', '+48 hours'))`
+          `INSERT INTO pending_registrations (email, username, password_hash, verify_token, verify_attempts, expires_at)
+           VALUES (?, ?, ?, ?, 0, datetime('now', '+48 hours'))`
         )
-        .bind(mail, name, passHash, verifyToken)
+        .bind(mail, name, passHash, verifyCode)
         .run();
 
       const today = new Date().toLocaleDateString("zh-CN");
-      const verifyUrl = `${siteOrigin(request)}/api/auth?action=verify&token=${verifyToken}`;
       try {
         await sendMail(
           env,
           mail,
-          "1024201 游戏中心 · 请验证邮箱",
-          welcomeEmailHtml(name, verifyUrl, today)
+          "1024201 · 注册验证码 / Registration Code",
+          welcomeEmailHtml(name, verifyCode, today)
         );
       } catch (err) {
-        await db.prepare("DELETE FROM pending_registrations WHERE verify_token = ?").bind(verifyToken).run();
+        await db.prepare("DELETE FROM pending_registrations WHERE email = ?").bind(mail).run();
         throw err;
       }
 
       return json({
         success: true,
         verify_sent: true,
-        message: `验证邮件已发送至 ${mail}，请点击邮件中的链接完成注册后再登录。`,
+        sent_at: new Date().toISOString(),
+        verify_attempts: 0,
+        message: `注册邮件已发送至 ${mail}，请查收验证码并在页面输入完成注册。`,
       });
     }
 
@@ -232,14 +262,6 @@ export async function onRequest(context) {
       const mail = email?.trim();
       const pass = password?.trim();
       if (!mail || !pass) return json({ error: "邮箱和密码不能为空" }, 400);
-
-      const pending = await db
-        .prepare("SELECT id FROM pending_registrations WHERE email = ? AND expires_at > datetime('now')")
-        .bind(mail)
-        .first();
-      if (pending) {
-        return json({ error: "注册尚未完成，请查收验证邮件并点击链接后再登录" }, 403);
-      }
 
       const user = await findUserByEmail(db, mail);
       if (!user) return json({ error: "该邮箱尚未注册" }, 404);
@@ -275,8 +297,14 @@ export async function onRequest(context) {
       await sendMail(
         env,
         mail,
-        "1024201 游戏中心 · 临时密码",
-        `<p>你的临时密码是：<strong>${temp}</strong></p><p>请在 24 小时内使用临时密码登录，并按提示修改新密码。</p>`
+        "1024201 · 临时密码 / Temporary Password",
+        `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:15px;line-height:1.8;color:#1c1c1e;">
+<p style="margin:0 0 8px;">你的临时密码是：<strong>${temp}</strong></p>
+<p style="margin:0 0 8px;">Your temporary password: <strong>${temp}</strong></p>
+<p style="margin:0 0 8px;">请在 24 小时内使用临时密码登录，并按提示修改新密码。</p>
+<p style="margin:0 0 16px;">Sign in within 24 hours using this password, then set a new one when prompted.</p>
+<p style="margin:0;"><strong>1024201</strong></p>
+</div>`
       );
       return json({ success: true, message: "临时密码已发送至邮箱" });
     }

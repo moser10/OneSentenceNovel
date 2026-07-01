@@ -1,0 +1,120 @@
+.account-chrome {
+  position: relative;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+.account-chrome-guest-group {
+  display: inline-flex;
+  align-items: stretch;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.account-chrome--stack .account-chrome-guest-group {
+  flex-direction: column;
+}
+
+.account-chrome--inline .account-chrome-guest-group {
+  flex-direction: row;
+}
+
+.account-chrome-guest-group .lang-tabs-host {
+  display: flex;
+}
+
+.account-chrome-guest-group .lang-tabs {
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.account-chrome-guest-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #007aff;
+  text-decoration: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+.account-chrome--inline .account-chrome-guest-btn {
+  width: 40px;
+  min-height: 31px;
+  border-left: 1px solid #f0f0f0;
+}
+
+.account-chrome--stack .account-chrome-guest-btn {
+  width: 36px;
+  min-height: 34px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.account-chrome-guest-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: #007aff;
+  display: block;
+}
+
+.account-chrome-guest-btn:active {
+  background: #e5e5ea;
+}
+
+.account-chrome-signed {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.account-chrome--inline .account-chrome-signed {
+  flex-direction: row;
+  align-items: center;
+}
+
+.account-chrome--stack .account-chrome-signed {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.account-chrome-user-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.account-chrome-lang-wrap {
+  flex-shrink: 0;
+}
+
+.account-chrome--game .user-bar-guest,
+.account-chrome--game .user-bar-name {
+  background: #e8f4fd;
+}
+
+.account-chrome--ios .user-bar-guest,
+.account-chrome--ios .user-bar-name {
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.account-chrome--inline.account-chrome--signed .account-chrome-user-wrap {
+  order: 1;
+}
+
+.account-chrome--inline.account-chrome--signed .account-chrome-lang-wrap {
+  order: 2;
+}
+
+.account-chrome--stack.account-chrome--signed .account-chrome-user-wrap {
+  order: 1;
+}
+
+.account-chrome--stack.account-chrome--signed .account-chrome-lang-wrap {
+  order: 2;
+}

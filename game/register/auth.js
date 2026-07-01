@@ -1,8 +1,11 @@
 import { setUser } from "../js/store.js";
 import { bindNameCheck } from "../onesentence/js/nameCheck.js";
-import { mountUserBar } from "../js/userBar.js";
+import { mountAccountChrome } from "/js/accountChrome.js";
 
 const API = "";
+const CODE_WINDOW_MS = 60_000;
+const MAX_VERIFY_ATTEMPTS = 5;
+const GAME_CENTER = "/game/";
 
 async function api(path, options = {}) {
   const res = await fetch(`${API}${path}`, options.headers?.["Content-Type"] === undefined && options.body
@@ -12,6 +15,7 @@ async function api(path, options = {}) {
   if (!res.ok) {
     const err = new Error(data.error || `HTTP ${res.status}`);
     err.data = data;
+    err.status = res.status;
     throw err;
   }
   return data;
@@ -24,6 +28,8 @@ const authApi = {
     api("/api/auth?action=check_email", { method: "POST", body: JSON.stringify({ email }) }),
   register: (email, username, password) =>
     api("/api/auth?action=register", { method: "POST", body: JSON.stringify({ email, username, password }) }),
+  verifyCode: (email, code) =>
+    api("/api/auth?action=verify_code", { method: "POST", body: JSON.stringify({ email, code }) }),
   login: (email, password) =>
     api("/api/auth?action=login", { method: "POST", body: JSON.stringify({ email, password }) }),
   forgot: (email) =>
@@ -31,22 +37,28 @@ const authApi = {
 };
 
 const params = new URLSearchParams(location.search);
-const returnTo = params.get("return") || "/game/";
-const verifyStatus = params.get("verify");
+const returnTo = params.get("return") || GAME_CENTER;
 
 const app = document.getElementById("app");
+
+let nameOk = false;
+let emailOk = false;
+let passOk = false;
+let regLocked = false;
+let mailSentAt = null;
+let verifyAttempts = 0;
+let awaitingCode = false;
 
 function renderShell() {
   app.innerHTML = `
   <div class="auth-page">
     <div class="auth-top">
-      <a href="/game/" class="back">← 返回游戏中心</a>
-      <div id="registerUserBar"></div>
+      <a href="/game/" class="btn-secondary btn-small">返回游戏中心</a>
+      <div id="accountChrome"></div>
     </div>
   <div class="card">
-    <h1>注册游戏账户 · 一票通</h1>
-    <p class="sub">一个账号，畅玩所有游戏</p>
-    <div id="verifyBanner"></div>
+    <h1>注册账户</h1>
+    <p class="sub">一票通</p>
     <div class="tabs">
       <div class="tab active" data-tab="register">注册</div>
       <div class="tab" data-tab="login">登录</div>
@@ -66,6 +78,7 @@ function renderShell() {
       <label>确认密码</label>
       <input type="password" id="regPass2" minlength="6">
       <p id="regPassHint" class="hint"></p>
+      <p id="regSpamHint" class="hint spam-hint" hidden>若未收到邮件，请检查垃圾邮件或促销邮件文件夹，并将 admin@1024201.com 加入联系人后重试。</p>
       <button id="regBtn" class="btn-primary" disabled>注册</button>
     </div>
     <div id="panelLogin" class="panel">
@@ -77,21 +90,21 @@ function renderShell() {
       <button id="forgotBtn" class="btn-link">忘记密码？获取临时密码</button>
     </div>
   </div>
+  </div>
+  <div id="verifyModal" class="verify-modal" hidden>
+    <div class="verify-modal-card" role="dialog" aria-modal="true">
+      <h2>输入注册码</h2>
+      <p class="sub" id="verifyModalSub">验证码已发送至您的邮箱</p>
+      <input type="text" id="verifyCodeInput" maxlength="4" autocomplete="one-time-code" inputmode="text" placeholder="4位注册码">
+      <p id="verifyCodeErr" class="hint err verify-err" hidden></p>
+      <button type="button" id="verifySubmitBtn" class="btn-primary">确认</button>
+      <button type="button" id="verifyCancelBtn" class="btn-link">取消</button>
+    </div>
   </div>`;
-  mountUserBar(document.getElementById("registerUserBar"), { variant: "game", returnPath: returnTo.replace(/^\//, "") });
-}
-
-function showVerifyBanner() {
-  const box = document.getElementById("verifyBanner");
-  if (!box) return;
-  if (verifyStatus === "ok") {
-    box.innerHTML = `<p class="hint ok">邮箱验证成功，请登录。</p>`;
-    switchTab("login");
-  } else if (verifyStatus === "invalid") {
-    box.innerHTML = `<p class="hint err">验证链接无效或已过期，请重新注册。</p>`;
-  } else if (verifyStatus === "conflict") {
-    box.innerHTML = `<p class="hint err">验证时昵称已被他人占用，请重新注册并换一个昵称。</p>`;
-  }
+  mountAccountChrome(document.getElementById("accountChrome"), {
+    variant: "game",
+    returnPath: returnTo.replace(/^\//, ""),
+  });
 }
 
 function switchTab(name) {
@@ -100,16 +113,148 @@ function switchTab(name) {
   document.getElementById("panelLogin").classList.toggle("active", name === "login");
 }
 
-let nameOk = false;
-let emailOk = false;
-let passOk = false;
+function canReopenCodePopup() {
+  if (!mailSentAt || regLocked) return false;
+  if (verifyAttempts >= MAX_VERIFY_ATTEMPTS) return false;
+  return Date.now() - mailSentAt < CODE_WINDOW_MS;
+}
 
 function syncRegBtn() {
-  document.getElementById("regBtn").disabled = !(nameOk && emailOk && passOk);
+  const btn = document.getElementById("regBtn");
+  const ready = nameOk && emailOk && passOk;
+  if (regLocked) {
+    btn.textContent = "再次发送注册邮件";
+    btn.disabled = !ready;
+    return;
+  }
+  if (awaitingCode && canReopenCodePopup()) {
+    btn.textContent = "请输入注册码";
+    btn.disabled = false;
+    return;
+  }
+  if (awaitingCode && !canReopenCodePopup()) {
+    awaitingCode = false;
+  }
+  btn.textContent = ready ? "发送注册邮件" : "注册";
+  btn.disabled = !ready;
+}
+
+function showVerifyModal(email) {
+  const modal = document.getElementById("verifyModal");
+  document.getElementById("verifyModalSub").textContent = `注册码已发送至 ${email}`;
+  document.getElementById("verifyCodeInput").value = "";
+  hideVerifyError();
+  modal.hidden = false;
+  document.getElementById("verifyCodeInput").focus();
+}
+
+function hideVerifyModal() {
+  document.getElementById("verifyModal").hidden = true;
+}
+
+function onVerifyCancel() {
+  hideVerifyModal();
+  if (canReopenCodePopup()) {
+    awaitingCode = true;
+  } else {
+    awaitingCode = false;
+  }
+  syncRegBtn();
+}
+
+function showVerifyError(msg) {
+  const el = document.getElementById("verifyCodeErr");
+  el.textContent = msg;
+  el.hidden = false;
+  el.classList.remove("fade-out");
+  void el.offsetWidth;
+  setTimeout(() => el.classList.add("fade-out"), 2200);
+  setTimeout(() => {
+    el.hidden = true;
+    el.classList.remove("fade-out");
+  }, 2800);
+}
+
+function hideVerifyError() {
+  const el = document.getElementById("verifyCodeErr");
+  el.hidden = true;
+  el.textContent = "";
+}
+
+function goAfterRegister(user) {
+  setUser(user);
+  window.location.href = GAME_CENTER;
+}
+
+function goAfterLogin(user) {
+  setUser(user);
+  const dest = returnTo.startsWith("/") ? returnTo : `/game/${returnTo}`;
+  window.location.href = dest === "/game/register/" || dest.includes("/register") ? GAME_CENTER : dest;
+}
+
+async function handleRegBtnClick() {
+  if (awaitingCode && canReopenCodePopup()) {
+    showVerifyModal(document.getElementById("regEmail").value.trim());
+    return;
+  }
+  await sendRegisterMail();
+}
+
+async function sendRegisterMail() {
+  if (!emailOk || !nameOk || !passOk) return;
+  const email = document.getElementById("regEmail").value.trim();
+  const name = document.getElementById("regName").value.trim();
+  const pass = document.getElementById("regPass").value;
+  try {
+    const data = await authApi.register(email, name, pass);
+    regLocked = false;
+    verifyAttempts = data.verify_attempts || 0;
+    mailSentAt = data.sent_at ? Date.parse(data.sent_at) : Date.now();
+    awaitingCode = true;
+    document.getElementById("regSpamHint").hidden = true;
+    syncRegBtn();
+    showVerifyModal(email);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function submitVerifyCode() {
+  const email = document.getElementById("regEmail").value.trim();
+  const code = document.getElementById("verifyCodeInput").value.trim();
+  if (!code) {
+    showVerifyError("请输入注册码");
+    return;
+  }
+  try {
+    const data = await authApi.verifyCode(email, code);
+    awaitingCode = false;
+    mailSentAt = null;
+    hideVerifyModal();
+    goAfterRegister(data.user);
+  } catch (e) {
+    if (typeof e.data?.verify_attempts === "number") {
+      verifyAttempts = e.data.verify_attempts;
+    } else if (typeof e.data?.attempts_left === "number") {
+      verifyAttempts = MAX_VERIFY_ATTEMPTS - e.data.attempts_left;
+    }
+    if (e.data?.locked) {
+      hideVerifyModal();
+      regLocked = true;
+      awaitingCode = false;
+      mailSentAt = null;
+      document.getElementById("regSpamHint").hidden = false;
+      syncRegBtn();
+      alert("注册码错误次数过多，请重新发送注册邮件");
+      return;
+    }
+    syncRegBtn();
+    showVerifyError(e.message || "注册码错误");
+  }
 }
 
 renderShell();
-showVerifyBanner();
+syncRegBtn();
 
 document.querySelectorAll(".tab").forEach((t) => {
   t.onclick = () => switchTab(t.dataset.tab);
@@ -195,28 +340,17 @@ function validateRegPass() {
 document.getElementById("regPass").oninput = validateRegPass;
 document.getElementById("regPass2").oninput = validateRegPass;
 
-function goNext(user) {
-  setUser(user);
-  window.location.href = returnTo.startsWith("/") ? returnTo : `/game/${returnTo}`;
-}
+document.getElementById("regBtn").onclick = handleRegBtnClick;
+document.getElementById("verifySubmitBtn").onclick = submitVerifyCode;
+document.getElementById("verifyCancelBtn").onclick = onVerifyCancel;
+document.getElementById("verifyCodeInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") submitVerifyCode();
+});
+document.getElementById("verifyModal").addEventListener("click", (e) => {
+  if (e.target.id === "verifyModal") e.preventDefault();
+});
 
-document.getElementById("regBtn").onclick = async () => {
-  if (!emailOk || !nameOk || !passOk) return;
-  try {
-    const data = await authApi.register(
-      regEmail.value.trim(),
-      document.getElementById("regName").value.trim(),
-      document.getElementById("regPass").value
-    );
-    document.getElementById("panelRegister").innerHTML = `
-      <p class="hint ok">${data.message || "验证邮件已发送，请查收。"}</p>
-      <p class="sub">验证完成后请切换到「登录」标签登录游戏。</p>
-      <button type="button" class="btn-primary" id="gotoLoginBtn">去登录</button>`;
-    document.getElementById("gotoLoginBtn").onclick = () => switchTab("login");
-  } catch (e) {
-    alert(e.message);
-  }
-};
+setInterval(syncRegBtn, 5000);
 
 document.getElementById("loginBtn").onclick = async () => {
   try {
@@ -224,7 +358,7 @@ document.getElementById("loginBtn").onclick = async () => {
       document.getElementById("loginEmail").value.trim(),
       document.getElementById("loginPass").value
     );
-    goNext(data.user);
+    goAfterLogin(data.user);
   } catch (e) {
     alert(e.message);
   }

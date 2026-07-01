@@ -63,6 +63,16 @@ body {
   color: #8e8e93;
   text-align: center;
 }
+.hub-top .account-chrome {
+  margin-left: auto;
+  flex: 0 1 auto;
+  max-width: min(100%, 240px);
+}
+.hub-top-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
 .hub-top {
   display: flex;
   justify-content: space-between;
@@ -71,6 +81,20 @@ body {
   margin-bottom: 8px;
 }
 .hub-top .back { margin-bottom: 0; }
+.btn-secondary {
+  background: #e5e5ea;
+  color: #007aff;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-small { padding: 8px 12px; font-size: 13px; }
+.btn-secondary:active { opacity: 0.85; }
 .back {
   display: inline-block;
   margin-bottom: 20px;

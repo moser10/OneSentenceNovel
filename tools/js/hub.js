@@ -1,4 +1,5 @@
 import { getPortalLang, mountLangTabs } from "/js/langTabs.js";
+import { mountAccountChrome } from "/js/accountChrome.js";
 
 const MUSIC_SVG = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg>`;
 
@@ -59,19 +60,18 @@ function render() {
     <div class="hub">
       <div class="hub-top">
         <a href="/" class="feature-back">${t.back}</a>
-        <div class="hub-top-right">
-          <div id="hubLangSlot"></div>
-        </div>
+        <div id="hubAccountChrome"></div>
       </div>
       <h1>${t.title}</h1>
       <p class="sub">${t.sub}</p>
       <div class="grid" id="toolGrid"></div>
     </div>`;
 
-  mountLangTabs(document.getElementById("hubLangSlot"), {
+  mountAccountChrome(document.getElementById("hubAccountChrome"), {
+    variant: "game",
+    returnPath: "tools/",
     active: lang,
-    layout: "horizontal",
-    onChange: (next) => {
+    onLangChange: (next) => {
       lang = next;
       render();
     },
